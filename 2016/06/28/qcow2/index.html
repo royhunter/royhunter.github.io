@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <meta charset="utf-8">
+    
+    <title>qcow2原理详解 | RoyLuo&#39;s Notes</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="description" content="Qcow2镜像格式是qemu支持的磁盘镜像格式之一，目前虚拟化中主流的镜像格式。">
+<meta name="keywords" content="QEMU">
+<meta property="og:type" content="article">
+<meta property="og:title" content="qcow2原理详解">
+<meta property="og:url" content="http://royhunter.github.io/2016/06/28/qcow2/index.html">
+<meta property="og:site_name" content="RoyLuo&#39;s Notes">
+<meta property="og:description" content="Qcow2镜像格式是qemu支持的磁盘镜像格式之一，目前虚拟化中主流的镜像格式。">
+<meta property="og:locale" content="en">
+<meta property="og:image" content="http://7j1zal.com1.z0.glb.clouddn.com/refcount%20table.PNG">
+<meta property="og:image" content="http://7j1zal.com1.z0.glb.clouddn.com/l1l2.PNG">
+<meta property="og:image" content="http://7j1zal.com1.z0.glb.clouddn.com/qcow2_layout.PNG">
+<meta property="og:image" content="http://7j1zal.com1.z0.glb.clouddn.com/snapshot.PNG">
+<meta property="og:updated_time" content="2016-06-28T14:51:40.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="qcow2原理详解">
+<meta name="twitter:description" content="Qcow2镜像格式是qemu支持的磁盘镜像格式之一，目前虚拟化中主流的镜像格式。">
+<meta name="twitter:image" content="http://7j1zal.com1.z0.glb.clouddn.com/refcount%20table.PNG">
+    
+
+    
+        <link rel="alternate" href="atom.xml" title="RoyLuo&#39;s Notes" type="application/atom+xml" />
+    
+
+    
+
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fontawesome.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-brands.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-solid.min.css">
+    <link rel="stylesheet" href="/libs/open-sans/styles.css">
+    <link rel="stylesheet" href="/libs/source-code-pro/styles.css">
+
+    <link rel="stylesheet" href="/css/style.css">
+
+    <script src="/libs/jquery/2.1.3/jquery.min.js"></script>
+    
+    
+        <link rel="stylesheet" href="/libs/lightgallery/css/lightgallery.min.css">
+    
+    
+        <link rel="stylesheet" href="/libs/justified-gallery/justifiedGallery.min.css">
+    
+    
+    
+    
+
+
+</head>
+
+<body>
+    <div id="container">
+        <header id="header">
+    <div id="header-main" class="header-inner">
+        <div class="outer">
+            <a href="/" id="logo">
+                <i class="logo"></i>
+                <span class="site-title">RoyLuo&#39;s Notes</span>
+            </a>
+            <nav id="main-nav">
+                
+                    <a class="main-nav-link" href="/.">Home</a>
+                
+                    <a class="main-nav-link" href="/archives">Archives</a>
+                
+                    <a class="main-nav-link" href="/categories">Categories</a>
+                
+                    <a class="main-nav-link" href="/tags">Tags</a>
+                
+                    <a class="main-nav-link" href="/proj">Projects</a>
+                
+                    <a class="main-nav-link" href="/book">Books</a>
+                
+                    <a class="main-nav-link" href="/about">About</a>
+                
+            </nav>
+            
+                
+                <nav id="sub-nav">
+                    <div class="profile" id="profile-nav">
+                        <a id="profile-anchor" href="javascript:;">
+                            <img class="avatar" src="/css/images/image_y.png" />
+                            <i class="fas fa-caret-down"></i>
+                        </a>
+                    </div>
+                </nav>
+            
+            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+        <button type="submit" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" placeholder="Type something..." />
+            <span class="ins-close ins-selectable"><i class="fas fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script>
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: 'Posts',
+            PAGES: 'Pages',
+            CATEGORIES: 'Categories',
+            TAGS: 'Tags',
+            UNTITLED: '(Untitled)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+<script src="/js/insight.js"></script>
+
+</div>
+        </div>
+    </div>
+    <div id="main-nav-mobile" class="header-sub header-inner">
+        <table class="menu outer">
+            <tr>
+                
+                    <td><a class="main-nav-link" href="/.">Home</a></td>
+                
+                    <td><a class="main-nav-link" href="/archives">Archives</a></td>
+                
+                    <td><a class="main-nav-link" href="/categories">Categories</a></td>
+                
+                    <td><a class="main-nav-link" href="/tags">Tags</a></td>
+                
+                    <td><a class="main-nav-link" href="/proj">Projects</a></td>
+                
+                    <td><a class="main-nav-link" href="/book">Books</a></td>
+                
+                    <td><a class="main-nav-link" href="/about">About</a></td>
+                
+                <td>
+                    
+    <div class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+    </div>
+
+                </td>
+            </tr>
+        </table>
+    </div>
+</header>
+
+        <div class="outer">
+            
+                
+
+<aside id="profile" class="profile-fixed">
+    <div class="inner profile-inner">
+        <div class="base-info profile-block">
+            <img id="avatar" src="/css/images/image_y.png" />
+            <h2 id="name">Roy Luo</h2>
+            <h3 id="title">Designer &amp; Developer</h3>
+            <span id="location"><i class="fas fa-map-marker-alt" style="padding-right: 5px"></i>Beijing, China</span>
+            <a id="follow" target="_blank" href="https://github.com/royhunter/">FOLLOW</a>
+        </div>
+        <div class="article-info profile-block">
+            <div class="article-info-block">
+                43
+                <span>posts</span>
+            </div>
+            <div class="article-info-block">
+                15
+                <span>tags</span>
+            </div>
+        </div>
+        
+        <div class="profile-block social-links">
+            <table>
+                <tr>
+                    
+                    
+                    <td>
+                        <a href="http://github.com/royhunter/" target="_blank" title="github" class=tooltip>
+                            <i class="fab fa-github"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://twitter.com/RoyLuoye" target="_blank" title="twitter" class=tooltip>
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://www.facebook/roy.luo.3367" target="_blank" title="facebook" class=tooltip>
+                            <i class="fab fa-facebook"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://cn.linkedin.com/in/royluoye" target="_blank" title="linkedin" class=tooltip>
+                            <i class="fab fa-linkedin"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="/atom.xml" target="_blank" title="rss" class=tooltip>
+                            <i class="fab fa-rss"></i>
+                        </a>
+                    </td>
+                    
+                </tr>
+            </table>
+        </div>
+        
+    </div>
+</aside>
+
+            
+            <section id="main"><article id="post-qcow2" class="article article-type-post" itemscope itemprop="blogPost">
+    <div class="article-inner">
+        
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+            qcow2原理详解
+        </h1>
+    
+
+                
+                    <div class="article-meta">
+                        
+    <div class="article-date">
+        <i class="fas fa-calendar-alt"></i>
+        <a href="/2016/06/28/qcow2/">
+            <time datetime="2016-06-28T14:25:50.000Z" itemprop="datePublished">2016-06-28</time>
+        </a>
+    </div>
+
+
+                        
+    <div class="article-category">
+    	<i class="fas fa-folder"></i>
+        <a class="article-category-link" href="/categories/KVM/">KVM</a>
+    </div>
+
+                        
+    <div class="article-tag">
+        <i class="fas fa-tag"></i>
+        <a class="tag-link" href="/tags/QEMU/">QEMU</a>
+    </div>
+
+                    </div>
+                
+            </header>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+        
+            
+            <p>Qcow2镜像格式是qemu支持的磁盘镜像格式之一，目前虚拟化中主流的镜像格式。</p>
+<a id="more"></a> 
+<h2 id="Terminology"><a href="#Terminology" class="headerlink" title="Terminology"></a>Terminology</h2><table>
+<thead>
+<tr>
+<th>terminology</th>
+<th>explain</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>cluster</td>
+<td>一个Qcow2 img文件由固定大小的单元组成，该单元称为cluster，默认大小为65536bytes/64K</td>
+</tr>
+<tr>
+<td>sector</td>
+<td>数据块读写的最小单元，大小为512字节</td>
+</tr>
+<tr>
+<td>host cluster</td>
+<td>位于Host上qcow2 img文件的cluster管理名称</td>
+</tr>
+<tr>
+<td>guest cluster</td>
+<td>Guest所看到的virtual disk的cluster管理名称</td>
+</tr>
+<tr>
+<td>Qcow2 Header</td>
+<td>Qcow2 img的文件头信息，占用第一个cluster</td>
+</tr>
+<tr>
+<td>refcount</td>
+<td>Qcow2内部用于管理cluster的分配而维护的引用计数</td>
+</tr>
+<tr>
+<td>refcount table</td>
+<td>用于查找refcount的第一级表</td>
+</tr>
+<tr>
+<td>refcount block</td>
+<td>用于查找refcount的第二级表</td>
+</tr>
+<tr>
+<td>L1 table</td>
+<td>用于查找guest cluster到host cluster映射的第一级表</td>
+</tr>
+<tr>
+<td>L2 table</td>
+<td>用于查找guest cluster到host cluster映射的第二级表</td>
+</tr>
+<tr>
+<td>IBA</td>
+<td>image block address</td>
+</tr>
+<tr>
+<td>VBA</td>
+<td>virtual block address</td>
+</tr>
+</tbody>
+</table>
+<h2 id="Qcow2镜像的组成"><a href="#Qcow2镜像的组成" class="headerlink" title="Qcow2镜像的组成"></a>Qcow2镜像的组成</h2><h3 id="Qcow2-Header"><a href="#Qcow2-Header" class="headerlink" title="Qcow2 Header"></a>Qcow2 Header</h3><p>Qcow2 img头描述了这个img的一些相关信息，该头部占用一个cluster，固定存放在文件起始处。<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">QCowHeader</span> &#123;</span></span><br><span class="line">    <span class="keyword">uint32_t</span> magic;</span><br><span class="line">    <span class="keyword">uint32_t</span> version;</span><br><span class="line">    <span class="keyword">uint64_t</span> backing_file_offset;</span><br><span class="line">    <span class="keyword">uint32_t</span> backing_file_size;</span><br><span class="line">    <span class="keyword">uint32_t</span> cluster_bits;           <span class="comment">//1 &lt;&lt; cluster_bits is the cluster size</span></span><br><span class="line">    <span class="keyword">uint64_t</span> size; <span class="comment">/* in bytes */</span>    <span class="comment">//虚拟磁盘的大小</span></span><br><span class="line">    <span class="keyword">uint32_t</span> crypt_method;</span><br><span class="line">    <span class="keyword">uint32_t</span> l1_size;                <span class="comment">//L1表的entry数目</span></span><br><span class="line">    <span class="keyword">uint64_t</span> l1_table_offset;        <span class="comment">//L1表在img中的偏移</span></span><br><span class="line">    <span class="keyword">uint64_t</span> refcount_table_offset;  <span class="comment">//refcount table在img中的偏移</span></span><br><span class="line">    <span class="keyword">uint32_t</span> refcount_table_clusters;<span class="comment">//refcount table所占用的cluster数目</span></span><br><span class="line">    <span class="keyword">uint32_t</span> nb_snapshots;           <span class="comment">//snapshot的个数</span></span><br><span class="line">    <span class="keyword">uint64_t</span> snapshots_offset;       <span class="comment">//snapshot相对img file的offset</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* The following fields are only valid for version &gt;= 3 */</span></span><br><span class="line">    <span class="keyword">uint64_t</span> incompatible_features;</span><br><span class="line">    <span class="keyword">uint64_t</span> compatible_features;</span><br><span class="line">    <span class="keyword">uint64_t</span> autoclear_features;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">uint32_t</span> refcount_order;</span><br><span class="line">    <span class="keyword">uint32_t</span> header_length;      <span class="comment">//sizeof(QCowHeader)</span></span><br><span class="line">&#125; QEMU_PACKED QCowHeader;</span><br></pre></td></tr></table></figure></p>
+<h3 id="Qcow2-Host-cluster-management"><a href="#Qcow2-Host-cluster-management" class="headerlink" title="Qcow2 Host cluster management"></a>Qcow2 Host cluster management</h3><p>Qcow2维护refcount用以管理image中cluster的分配和释放，refcount作用等同于引用计数，代表了指定的cluster的使用状态：<br>0： 表示空闲<br>1： 表示已使用<br>大于等于2：表示已使用并且写访问必须执行COW操作</p>
+<p>refcounts通过二级表(类似页表)来进行索引，第一级表称为refcount table,其大小可变、连续、占用多个cluster，其表项中每一个条目为指向第二级表的指针(相对于img file的offset)，每个条目占64bits。<br>第二级表称为refcount block，每个refcount block占用1个cluster，表中每个条目为2个字节大小的refcount。</p>
+<p>给定一个相对于img file的offset可以通过下面计算关系得到refcount：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">refcount_block_entries = (cluster_size / <span class="keyword">sizeof</span>(<span class="keyword">uint16_t</span>))</span><br><span class="line">refcount_block_index = (offset / cluster_size) % refcount_table_entries</span><br><span class="line">refcount_table_index = (offset / cluster_size) / refcount_table_entries</span><br><span class="line">refcount_block = load_cluster(refcount_table[refcount_table_index]);</span><br><span class="line"><span class="keyword">return</span> refcount_block[refcount_block_index];</span><br></pre></td></tr></table></figure></p>
+<p><img src="http://7j1zal.com1.z0.glb.clouddn.com/refcount%20table.PNG" alt=""></p>
+<h3 id="Qcow2-Cluster-mapping-Guest-gt-Host"><a href="#Qcow2-Cluster-mapping-Guest-gt-Host" class="headerlink" title="Qcow2 Cluster mapping(Guest-&gt;Host)"></a>Qcow2 Cluster mapping(Guest-&gt;Host)</h3><p>Guest OS看到的只是virtual disk，操作的是Guest Cluster,所以Qcow2镜像另个重要功能就是管理Guest Cluster到Host Cluster的映射。<br>Guest Cluster到Host Cluster的映射关系也是通过一个二级表来管理，称为L1表和L2表，L1表大小可变、连续、占用多个cluster，其表项中每一个条目为指向L2的指针(相对于img file的offset)，每个条目占64bits。<br>L2表占用一个cluster，每个条目占64bits.</p>
+<p><img src="http://7j1zal.com1.z0.glb.clouddn.com/l1l2.PNG" alt=""></p>
+<p>给定一个相对于virtual disk的offset，可以通过下面计算关系得到Host Cluster offset：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">l2_entries = (cluster_size / <span class="keyword">sizeof</span>(<span class="keyword">uint64_t</span>))</span><br><span class="line">l2_index = (offset / cluster_size) % l2_entries</span><br><span class="line">l1_index = (offset / cluster_size) / l2_entries</span><br><span class="line">l2_table = load_cluster(l1_table[l1_index]);</span><br><span class="line">cluster_offset = l2_table[l2_index];</span><br><span class="line"><span class="keyword">return</span> cluster_offset + (offset % cluster_size)</span><br></pre></td></tr></table></figure></p>
+<h3 id="Qcow2-image-file的布局"><a href="#Qcow2-image-file的布局" class="headerlink" title="Qcow2 image file的布局"></a>Qcow2 image file的布局</h3><p>综合上述几个部分，可以看到Qcow2的大体布局，refcount table/refcount block/l1/l2的顺序关系不限<br><img src="http://7j1zal.com1.z0.glb.clouddn.com/qcow2_layout.PNG" alt=""></p>
+<h2 id="QEMU中关于Qcow2的实现"><a href="#QEMU中关于Qcow2的实现" class="headerlink" title="QEMU中关于Qcow2的实现"></a>QEMU中关于Qcow2的实现</h2><h3 id="源码"><a href="#源码" class="headerlink" title="源码"></a>源码</h3><p>Qcow2在qemu中的实现是作为块驱动实现，主要代码在：<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">block/qcow2.c</span><br><span class="line">block/qcow2-refcount.c</span><br><span class="line">block/qcow2-cluster.c</span><br><span class="line">block/qcow2-snapshot.c</span><br><span class="line">block/qcow2-cache.c</span><br></pre></td></tr></table></figure></p>
+<h3 id="Qcow2镜像的创建"><a href="#Qcow2镜像的创建" class="headerlink" title="Qcow2镜像的创建"></a>Qcow2镜像的创建</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$qemu</span>-img create -f qcow2 test.qcow2 1G</span><br><span class="line">Formatting <span class="string">'test.qcow2'</span>, fmt=qcow2 size=1073741824 encryption=off cluster_size=65536 lazy_refcounts=off </span><br><span class="line"><span class="variable">$qemu</span>-img info test.qcow2</span><br><span class="line">image: test.qcow2</span><br><span class="line">file format: qcow2</span><br><span class="line">virtual size: 1.0G (1073741824 bytes)</span><br><span class="line">disk size: 196K</span><br><span class="line">cluster_size: 65536</span><br><span class="line">Format specific information:</span><br><span class="line">    compat: 1.1</span><br><span class="line">    lazy refcounts: <span class="literal">false</span></span><br></pre></td></tr></table></figure>
+<h3 id="实现"><a href="#实现" class="headerlink" title="实现"></a>实现</h3><p>Qcow2 img的操作在qemu中都是作为一种块设备的blockdriver来实现的，qcow2对应的bdrv_create注册的函数是qcow2_create，创建流程如下：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">qcow2_create</span><br><span class="line">    qcow2_create2 </span><br><span class="line">        bdrv_create_file </span><br><span class="line">            bdrv_create </span><br><span class="line">                bdrv_create_co_entry        <span class="comment">//qemu协程入口</span></span><br><span class="line">                    raw_create</span><br></pre></td></tr></table></figure></p>
+<p>由于qcow2 image是以文件形式存在的，在Qcow2的底层仍需要通过文件操作写入实实在在的数据，在Qcow2管理结构上挂在了一个child管理结构，指向了bdrv_file的block driver，对应的API为raw_create,raw_open等。所以在层次划分上Qcow2 block driver完成了Qcow2内部格式的转换，比如Guest到host的cluster mapping，l1,l2表的建立，索引查找等。</p>
+<p>在image file的创建流程上，首先写入header，offset为0，大小为cluster size</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">blk_pwrite(blk, <span class="number">0</span>, header, cluster_size);</span><br></pre></td></tr></table></figure>
+<p>接着写入一个refcount table和一个refcount block<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">blk_pwrite(blk, cluster_size, refcount_table, <span class="number">2</span> * cluster_size);</span><br></pre></td></tr></table></figure></p>
+<p>分配3个cluster，讲上面使用的3个cluster占用<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">qcow2_alloc_clusters(blk_bs(blk), <span class="number">3</span> * cluster_size);</span><br></pre></td></tr></table></figure></p>
+<p>最后根据header的最新信息更新image的header<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">qcow2_update_header(blk_bs(blk));</span><br></pre></td></tr></table></figure></p>
+<h2 id="Qcow2-snapshot操作"><a href="#Qcow2-snapshot操作" class="headerlink" title="Qcow2 snapshot操作"></a>Qcow2 snapshot操作</h2><p>Qcow2支持internal snapshots,即snapshot和base img存在一个单一的image file中。Qcow2对snapshot的操作主要转换为对L1表的切换。因为L1表能寻址到data block，不同的l1表对Guest展现不同的data block，这就是Qcow2 snapshot的基本实现原理。</p>
+<p><img src="http://7j1zal.com1.z0.glb.clouddn.com/snapshot.PNG" alt=""></p>
+<h3 id="snapshot相关的命令"><a href="#snapshot相关的命令" class="headerlink" title="snapshot相关的命令"></a>snapshot相关的命令</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$qemu</span>-img snapshot -c snapshot01 test.qcow2     //创建快照snapshot01</span><br><span class="line"><span class="variable">$qemu</span>-img snapshot -l test.qcow2                //查看当前的snapshot信息</span><br><span class="line">Snapshot list:</span><br><span class="line">ID        TAG                 VM SIZE                DATE       VM CLOCK</span><br><span class="line">1         snapshot01                0 2016-06-27 02:21:55   00:00:00.000</span><br><span class="line"><span class="variable">$qemu</span>-img snapshot -a snapshot01 test.qcow2     //apply指定的快照</span><br><span class="line"><span class="variable">$qemu</span>-img snapshot -d snapshot01 test.qcow2     //删除指定的快照</span><br></pre></td></tr></table></figure>
+<h3 id="实现原理"><a href="#实现原理" class="headerlink" title="实现原理"></a>实现原理</h3><p>下面是snapshot的header信息，每一个snapshot都有一个header，而header中的l1_table_offset标示了该snapshot所使用的l1表。<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">QEMU_PACKED</span> <span class="title">QCowSnapshotHeader</span> &#123;</span></span><br><span class="line">    <span class="comment">/* header is 8 byte aligned */</span></span><br><span class="line">    <span class="keyword">uint64_t</span> l1_table_offset;    <span class="comment">//该snapshot所使用的l1表</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">uint32_t</span> l1_size;</span><br><span class="line">    <span class="keyword">uint16_t</span> id_str_size;</span><br><span class="line">    <span class="keyword">uint16_t</span> name_size;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">uint32_t</span> date_sec;</span><br><span class="line">    <span class="keyword">uint32_t</span> date_nsec;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">uint64_t</span> vm_clock_nsec;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">uint32_t</span> vm_state_size;</span><br><span class="line">    <span class="keyword">uint32_t</span> extra_data_size; <span class="comment">/* for extension */</span></span><br><span class="line">    <span class="comment">/* extra data follows */</span></span><br><span class="line">    <span class="comment">/* id_str follows */</span></span><br><span class="line">    <span class="comment">/* name follows  */</span></span><br><span class="line">&#125; QCowSnapshotHeader;</span><br></pre></td></tr></table></figure></p>
+<h4 id="Create-snapshot"><a href="#Create-snapshot" class="headerlink" title="Create snapshot"></a>Create snapshot</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$qemu</span>-img snapshot -c &lt;snapshot-name&gt; &lt;imagename&gt;</span><br></pre></td></tr></table></figure>
+<p>qcow2_snapshot_create:</p>
+<ol>
+<li>制造一个snapshot id；</li>
+<li>分配snapshot header空间，填充信息；</li>
+<li>分配l1表的空间，并从当前的image的l1表中copy；</li>
+<li>将snapshot的l1表写入image file；</li>
+<li>操作所有cluster的refcount，主要是l2表和data block的cluster；</li>
+<li>增加refcount，并置cluster的状态的copied位；表明这些cluster在写操作是需执行COW;</li>
+<li>将snapshot header写入image file；</li>
+</ol>
+<h4 id="List-snapshot"><a href="#List-snapshot" class="headerlink" title="List snapshot"></a>List snapshot</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$qemu</span>-img snapshot -l &lt;imagename&gt;</span><br></pre></td></tr></table></figure>
+<h4 id="Apply-snapshot"><a href="#Apply-snapshot" class="headerlink" title="Apply snapshot"></a>Apply snapshot</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$qemu</span>-img snapshot -a &lt;snapshot-name&gt; &lt;imagename&gt;</span><br></pre></td></tr></table></figure>
+<p>qcow2_snapshot_goto：<br>主要操作就是切换snapshot的l1表为active；这样当有数据block的写入，寻址的都是snapshot的data block空间；</p>
+<h4 id="Delete-snapshot"><a href="#Delete-snapshot" class="headerlink" title="Delete snapshot"></a>Delete snapshot</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$qemu</span>-img snapshot -d &lt;snapshot-name&gt; &lt;imagename&gt;</span><br></pre></td></tr></table></figure>
+<h3 id="External-snapshot"><a href="#External-snapshot" class="headerlink" title="External snapshot"></a>External snapshot</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$qemu</span>-img create -b &lt;imagename1&gt; -f qcow2 -l &lt;imagename2&gt;</span><br></pre></td></tr></table></figure>
+<p>此命令用于创建Qcow2的external snapshot，即snapshot和base img处于不同的image file中，此时base img就属于backing file；snapshot的空间不占用backing file的空间，而backing file退化成只读模板。</p>
+<h2 id="Reference"><a href="#Reference" class="headerlink" title="Reference"></a>Reference</h2><ol>
+<li><a href="https://people.gnome.org/~markmc/qcow-image-format.html" target="_blank" rel="noopener">https://people.gnome.org/~markmc/qcow-image-format.html</a></li>
+<li><a href="http://git.qemu.org/?p=qemu.git;a=blob;f=docs/specs/qcow2.txt" target="_blank" rel="noopener">http://git.qemu.org/?p=qemu.git;a=blob;f=docs/specs/qcow2.txt</a></li>
+<li><a href="http://www.azertech.net/content/kvm-qemu-qcow2-qemu-img-and-snapshots" target="_blank" rel="noopener">http://www.azertech.net/content/kvm-qemu-qcow2-qemu-img-and-snapshots</a></li>
+<li><a href="http://researcher.watson.ibm.com/researcher/files/us-ctang/FVD-cow.pdf" target="_blank" rel="noopener">FVD: a High-Performance Virtual Machine Image Format for Cloud</a></li>
+</ol>
+
+        
+        </div>
+        <footer class="article-footer">
+            <div class="share-container">
+
+
+
+</div>
+
+    <a data-url="http://royhunter.github.io/2016/06/28/qcow2/" data-id="ck2oe6fok002rxkkv8byv1k4m" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+<script>
+    (function ($) {
+        // Prevent duplicate binding
+        if (typeof(__SHARE_BUTTON_BINDED__) === 'undefined' || !__SHARE_BUTTON_BINDED__) {
+            __SHARE_BUTTON_BINDED__ = true;
+        } else {
+            return;
+        }
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url'),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="fab fa-twitter article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="fab fa-facebook article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="fab fa-pinterest article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                            '<a href="https://plus.google.com/share?url=' + encodedUrl + '" class="fab fa-google article-share-google" target="_blank" title="Google+"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+            
+    
+
+        </footer>
+    </div>
+    
+        
+<nav id="article-nav">
+    
+        <a href="/2016/08/26/host-patch/" id="article-nav-newer" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Newer</strong>
+            <div class="article-nav-title">
+                
+                    Linker for hotpatch
+                
+            </div>
+        </a>
+    
+    
+        <a href="/2016/06/24/qemu-coroutine/" id="article-nav-older" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Older</strong>
+            <div class="article-nav-title">QEMU中的协程---qemu-coroutine</div>
+        </a>
+    
+</nav>
+
+
+    
+</article>
+
+
+    
+    
+
+</section>
+            
+                
+<aside id="sidebar">
+   
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">recent</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2020/07/12/index/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"></p>
+                            <p class="item-title"><a href="/2020/07/12/index/" class="title">Blog索引</a></p>
+                            <p class="item-date"><time datetime="2020-07-12T13:33:28.000Z" itemprop="datePublished">2020-07-12</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/07/17/ovs02-vxlan/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/07/17/ovs02-vxlan/" class="title">OVS02-VXLAN内核相关实现</a></p>
+                            <p class="item-date"><time datetime="2018-07-17T12:15:34.000Z" itemprop="datePublished">2018-07-17</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/01/10/perf-tunning/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/01/10/perf-tunning/" class="title">datapath性能优化总结</a></p>
+                            <p class="item-date"><time datetime="2018-01-10T13:26:32.000Z" itemprop="datePublished">2018-01-10</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2017/04/18/ovs01/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2017/04/18/ovs01/" class="title">OVS01-OVS基础-安装、配置、Simple Case</a></p>
+                            <p class="item-date"><time datetime="2017-04-18T13:26:32.000Z" itemprop="datePublished">2017-04-18</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2016/08/28/trampolines-for-nested-functions/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Programme/">Programme</a></p>
+                            <p class="item-title"><a href="/2016/08/28/trampolines-for-nested-functions/" class="title">Trampolines for Nested Functions in GCC</a></p>
+                            <p class="item-date"><time datetime="2016-08-28T13:26:32.000Z" itemprop="datePublished">2016-08-28</time></p>
+                        </div>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">categories</h3>
+        <div class="widget">
+            <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Algorithm/">Algorithm</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Container/">Container</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Docker/">Docker</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Hyper-V/">Hyper-V</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/KVM/">KVM</a><span class="category-list-count">22</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Misc/">Misc</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/PROGRAMME/">PROGRAMME</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Programme/">Programme</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Virtualization/">Virtualization</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/go/">go</a><span class="category-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">archives</h3>
+        <div class="widget">
+            <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">July 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">July 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">January 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">April 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">August 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/06/">June 2016</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/05/">May 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/03/">March 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/02/">February 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/01/">January 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/12/">December 2015</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/11/">November 2015</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/08/">August 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/07/">July 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/06/">June 2014</a><span class="archive-list-count">5</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tags</h3>
+        <div class="widget">
+            <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Container/">Container</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Distribute/">Distribute</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/EPT/">EPT</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux-namespace/">Linux namespace</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Network/">Network</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/PROGRAMME/">PROGRAMME</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Programme-Language/">Programme Language</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/QEMU/">QEMU</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Tools/">Tools</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization/">Virtualization</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization-KVM-QEMU/">Virtualization KVM QEMU</a><span class="tag-list-count">9</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/libvirt/">libvirt</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vhost/">vhost</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/virtio/">virtio</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vps-proxy/">vps_proxy</a><span class="tag-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tag cloud</h3>
+        <div class="widget tagcloud">
+            <a href="/tags/Container/" style="font-size: 12.5px;">Container</a> <a href="/tags/Distribute/" style="font-size: 12.5px;">Distribute</a> <a href="/tags/EPT/" style="font-size: 12.5px;">EPT</a> <a href="/tags/Linux-namespace/" style="font-size: 12.5px;">Linux namespace</a> <a href="/tags/Network/" style="font-size: 15px;">Network</a> <a href="/tags/PROGRAMME/" style="font-size: 10px;">PROGRAMME</a> <a href="/tags/Programme-Language/" style="font-size: 10px;">Programme Language</a> <a href="/tags/QEMU/" style="font-size: 12.5px;">QEMU</a> <a href="/tags/Tools/" style="font-size: 12.5px;">Tools</a> <a href="/tags/Virtualization/" style="font-size: 17.5px;">Virtualization</a> <a href="/tags/Virtualization-KVM-QEMU/" style="font-size: 20px;">Virtualization KVM QEMU</a> <a href="/tags/libvirt/" style="font-size: 10px;">libvirt</a> <a href="/tags/vhost/" style="font-size: 10px;">vhost</a> <a href="/tags/virtio/" style="font-size: 17.5px;">virtio</a> <a href="/tags/vps-proxy/" style="font-size: 10px;">vps_proxy</a>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">links</h3>
+        <div class="widget">
+            <ul>
+                
+                    <li>
+                        <a href="http://hexo.io">Hexo</a>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+
+    
+    <div id="toTop" class="fas fa-angle-up"></div>
+</aside>
+
+            
+        </div>
+        <footer id="footer">
+    <div class="outer">
+        <div id="footer-info" class="inner">
+            &copy; 2019 John Doe<br>
+            Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>. Theme by <a href="http://github.com/ppoffice">PPOffice</a>
+        </div>
+    </div>
+</footer>
+        
+
+
+    
+        <script src="/libs/lightgallery/js/lightgallery.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-thumbnail.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-pager.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-autoplay.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-fullscreen.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-zoom.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-hash.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-share.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-video.min.js"></script>
+    
+    
+        <script src="/libs/justified-gallery/jquery.justifiedGallery.min.js"></script>
+    
+    
+
+
+
+<!-- Custom Scripts -->
+<script src="/js/main.js"></script>
+
+    </div>
+</body>
+</html>

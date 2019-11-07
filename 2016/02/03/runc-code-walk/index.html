@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <meta charset="utf-8">
+    
+    <title>runC源码解读一 | RoyLuo&#39;s Notes</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="description" content="runC作为开放容器标准组织推出的开源容器项目，该工具可以及其轻量级的创建container，通过便捷的命令行工具并对其管理和操作。从整体架构来看，其对平台依赖较小，整个project都使用了Golang进行了开发。">
+<meta name="keywords" content="Container">
+<meta property="og:type" content="article">
+<meta property="og:title" content="runC源码解读一">
+<meta property="og:url" content="http://royhunter.github.io/2016/02/03/runc-code-walk/index.html">
+<meta property="og:site_name" content="RoyLuo&#39;s Notes">
+<meta property="og:description" content="runC作为开放容器标准组织推出的开源容器项目，该工具可以及其轻量级的创建container，通过便捷的命令行工具并对其管理和操作。从整体架构来看，其对平台依赖较小，整个project都使用了Golang进行了开发。">
+<meta property="og:locale" content="en">
+<meta property="og:image" content="http://7xoxkz.com1.z0.glb.clouddn.com/runc_4.png">
+<meta property="og:updated_time" content="2016-06-25T04:02:32.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="runC源码解读一">
+<meta name="twitter:description" content="runC作为开放容器标准组织推出的开源容器项目，该工具可以及其轻量级的创建container，通过便捷的命令行工具并对其管理和操作。从整体架构来看，其对平台依赖较小，整个project都使用了Golang进行了开发。">
+<meta name="twitter:image" content="http://7xoxkz.com1.z0.glb.clouddn.com/runc_4.png">
+    
+
+    
+        <link rel="alternate" href="atom.xml" title="RoyLuo&#39;s Notes" type="application/atom+xml" />
+    
+
+    
+
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fontawesome.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-brands.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-solid.min.css">
+    <link rel="stylesheet" href="/libs/open-sans/styles.css">
+    <link rel="stylesheet" href="/libs/source-code-pro/styles.css">
+
+    <link rel="stylesheet" href="/css/style.css">
+
+    <script src="/libs/jquery/2.1.3/jquery.min.js"></script>
+    
+    
+        <link rel="stylesheet" href="/libs/lightgallery/css/lightgallery.min.css">
+    
+    
+        <link rel="stylesheet" href="/libs/justified-gallery/justifiedGallery.min.css">
+    
+    
+    
+    
+
+
+</head>
+
+<body>
+    <div id="container">
+        <header id="header">
+    <div id="header-main" class="header-inner">
+        <div class="outer">
+            <a href="/" id="logo">
+                <i class="logo"></i>
+                <span class="site-title">RoyLuo&#39;s Notes</span>
+            </a>
+            <nav id="main-nav">
+                
+                    <a class="main-nav-link" href="/.">Home</a>
+                
+                    <a class="main-nav-link" href="/archives">Archives</a>
+                
+                    <a class="main-nav-link" href="/categories">Categories</a>
+                
+                    <a class="main-nav-link" href="/tags">Tags</a>
+                
+                    <a class="main-nav-link" href="/proj">Projects</a>
+                
+                    <a class="main-nav-link" href="/book">Books</a>
+                
+                    <a class="main-nav-link" href="/about">About</a>
+                
+            </nav>
+            
+                
+                <nav id="sub-nav">
+                    <div class="profile" id="profile-nav">
+                        <a id="profile-anchor" href="javascript:;">
+                            <img class="avatar" src="/css/images/image_y.png" />
+                            <i class="fas fa-caret-down"></i>
+                        </a>
+                    </div>
+                </nav>
+            
+            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+        <button type="submit" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" placeholder="Type something..." />
+            <span class="ins-close ins-selectable"><i class="fas fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script>
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: 'Posts',
+            PAGES: 'Pages',
+            CATEGORIES: 'Categories',
+            TAGS: 'Tags',
+            UNTITLED: '(Untitled)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+<script src="/js/insight.js"></script>
+
+</div>
+        </div>
+    </div>
+    <div id="main-nav-mobile" class="header-sub header-inner">
+        <table class="menu outer">
+            <tr>
+                
+                    <td><a class="main-nav-link" href="/.">Home</a></td>
+                
+                    <td><a class="main-nav-link" href="/archives">Archives</a></td>
+                
+                    <td><a class="main-nav-link" href="/categories">Categories</a></td>
+                
+                    <td><a class="main-nav-link" href="/tags">Tags</a></td>
+                
+                    <td><a class="main-nav-link" href="/proj">Projects</a></td>
+                
+                    <td><a class="main-nav-link" href="/book">Books</a></td>
+                
+                    <td><a class="main-nav-link" href="/about">About</a></td>
+                
+                <td>
+                    
+    <div class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+    </div>
+
+                </td>
+            </tr>
+        </table>
+    </div>
+</header>
+
+        <div class="outer">
+            
+                
+
+<aside id="profile" class="profile-fixed">
+    <div class="inner profile-inner">
+        <div class="base-info profile-block">
+            <img id="avatar" src="/css/images/image_y.png" />
+            <h2 id="name">Roy Luo</h2>
+            <h3 id="title">Designer &amp; Developer</h3>
+            <span id="location"><i class="fas fa-map-marker-alt" style="padding-right: 5px"></i>Beijing, China</span>
+            <a id="follow" target="_blank" href="https://github.com/royhunter/">FOLLOW</a>
+        </div>
+        <div class="article-info profile-block">
+            <div class="article-info-block">
+                43
+                <span>posts</span>
+            </div>
+            <div class="article-info-block">
+                15
+                <span>tags</span>
+            </div>
+        </div>
+        
+        <div class="profile-block social-links">
+            <table>
+                <tr>
+                    
+                    
+                    <td>
+                        <a href="http://github.com/royhunter/" target="_blank" title="github" class=tooltip>
+                            <i class="fab fa-github"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://twitter.com/RoyLuoye" target="_blank" title="twitter" class=tooltip>
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://www.facebook/roy.luo.3367" target="_blank" title="facebook" class=tooltip>
+                            <i class="fab fa-facebook"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://cn.linkedin.com/in/royluoye" target="_blank" title="linkedin" class=tooltip>
+                            <i class="fab fa-linkedin"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="/atom.xml" target="_blank" title="rss" class=tooltip>
+                            <i class="fab fa-rss"></i>
+                        </a>
+                    </td>
+                    
+                </tr>
+            </table>
+        </div>
+        
+    </div>
+</aside>
+
+            
+            <section id="main"><article id="post-runc-code-walk" class="article article-type-post" itemscope itemprop="blogPost">
+    <div class="article-inner">
+        
+            
+	
+		<img src="http://7xoxkz.com1.z0.glb.clouddn.com/runc_4.png" class="article-banner" />
+	
+
+
+
+        
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+            runC源码解读一
+        </h1>
+    
+
+                
+                    <div class="article-meta">
+                        
+    <div class="article-date">
+        <i class="fas fa-calendar-alt"></i>
+        <a href="/2016/02/03/runc-code-walk/">
+            <time datetime="2016-02-03T14:03:35.000Z" itemprop="datePublished">2016-02-03</time>
+        </a>
+    </div>
+
+
+                        
+    <div class="article-category">
+    	<i class="fas fa-folder"></i>
+        <a class="article-category-link" href="/categories/Container/">Container</a>
+    </div>
+
+                        
+    <div class="article-tag">
+        <i class="fas fa-tag"></i>
+        <a class="tag-link" href="/tags/Container/">Container</a>
+    </div>
+
+                    </div>
+                
+            </header>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+        
+            
+            <p>runC作为开放容器标准组织推出的开源容器项目，该工具可以及其轻量级的创建container，通过便捷的命令行工具并对其管理和操作。从整体架构来看，其对平台依赖较小，整个project都使用了Golang进行了开发。<br><a id="more"></a> </p>
+<h2 id="整体架构"><a href="#整体架构" class="headerlink" title="整体架构"></a>整体架构</h2><p>runC的架构比较简单，从技术构成角度来看，主要是一个便捷的命令行工具+libcontainer。</p>
+<p><img src="http://7xoxkz.com1.z0.glb.clouddn.com/runc_1.PNG" alt=""></p>
+<h2 id="CLI"><a href="#CLI" class="headerlink" title="CLI"></a>CLI</h2><p>runC的CLI是使用的<a href="github.com/codegangsta/cli">github.com/codegangsta/cli</a>, 该cli库也是Golang的第三方库，提供了一个易于使用的命令行接口。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$greet</span> <span class="built_in">help</span></span><br><span class="line">NAME:</span><br><span class="line">    greet - fight the loneliness!</span><br><span class="line"></span><br><span class="line">USAGE:</span><br><span class="line">    greet [global options] <span class="built_in">command</span> [<span class="built_in">command</span> options] [arguments...]</span><br><span class="line"></span><br><span class="line">VERSION:</span><br><span class="line">    0.0.0</span><br><span class="line"></span><br><span class="line">COMMANDS:</span><br><span class="line">    <span class="built_in">help</span>, h  Shows a list of commands or <span class="built_in">help</span> <span class="keyword">for</span> one <span class="built_in">command</span></span><br><span class="line"></span><br><span class="line">GLOBAL OPTIONS</span><br><span class="line">    --version   Shows version information</span><br></pre></td></tr></table></figure>
+<p>用户可自由添加CLI中所需的commands与options并提供对应的action function即可。<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">app.Commands = []cli.Command&#123;</span><br><span class="line">  &#123;</span><br><span class="line">    Name:      <span class="string">"add"</span>,</span><br><span class="line">    Aliases:     []string&#123;<span class="string">"a"</span>&#125;,</span><br><span class="line">    Usage:     <span class="string">"add a task to the list"</span>,</span><br><span class="line">    Action: func(c *cli.Context) &#123;</span><br><span class="line">      println(<span class="string">"added task: "</span>, c.Args().First())</span><br><span class="line">    &#125;,</span><br><span class="line">  &#125;,</span><br><span class="line">...</span><br></pre></td></tr></table></figure></p>
+<p>具体API可参看<a href="github.com/codegangsta/cli">github.com/codegangsta/cli</a>的官方说明文档，这里主要分析libcontainer的实现。</p>
+<h2 id="libcontainer"><a href="#libcontainer" class="headerlink" title="libcontainer"></a>libcontainer</h2><p>libcontainer为container的创建提供了一种golang的实现，包括container的namespace,cgroups,capability,filesystem access controls. 可以由使用者自由管理container的生命周期，包括container的checkpoint和restore。</p>
+<h3 id="Container创建流程"><a href="#Container创建流程" class="headerlink" title="Container创建流程"></a>Container创建流程</h3><p><img src="http://7xoxkz.com1.z0.glb.clouddn.com/runc_2.PNG" alt=""></p>
+<p>1 runc start命令行执行函数首先会导入配置文件，配置文件即config.json和runtime.json.都为json格式，主要描述了运行container所需的系统配置。 配置文件可以由用户自定义或者使用#runc spec自动生成默认的配置。</p>
+<p>2 在创建container前创建了Factory，Process，LinuxContainer等对象，这些对象主要是对container的运行环境进行了抽象的封装。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// LinuxFactory implements the default factory interface for linux based systems.</span></span><br><span class="line"><span class="keyword">type</span> LinuxFactory <span class="keyword">struct</span> &#123;</span><br><span class="line">	<span class="comment">// Root directory for the factory to store state.</span></span><br><span class="line">	Root <span class="keyword">string</span></span><br><span class="line"></span><br><span class="line">	<span class="comment">// InitPath is the absolute path to the init binary.</span></span><br><span class="line">	InitPath <span class="keyword">string</span></span><br><span class="line"></span><br><span class="line">	<span class="comment">// InitArgs are arguments for calling the init responsibilities for spawning</span></span><br><span class="line">	<span class="comment">// a container.</span></span><br><span class="line">	InitArgs []<span class="keyword">string</span></span><br><span class="line"></span><br><span class="line">	<span class="comment">// CriuPath is the path to the criu binary used for checkpoint and restore of</span></span><br><span class="line">	<span class="comment">// containers.</span></span><br><span class="line">	CriuPath <span class="keyword">string</span></span><br><span class="line"></span><br><span class="line">	<span class="comment">// Validator provides validation to container configurations.</span></span><br><span class="line">	Validator validate.Validator</span><br><span class="line"></span><br><span class="line">	<span class="comment">// NewCgroupsManager returns an initialized cgroups manager for a single container.</span></span><br><span class="line">	NewCgroupsManager <span class="function"><span class="keyword">func</span><span class="params">(config *configs.Cgroup, paths <span class="keyword">map</span>[<span class="keyword">string</span>]<span class="keyword">string</span>)</span> <span class="title">cgroups</span>.<span class="title">Manager</span></span></span><br><span class="line"><span class="function">&#125;</span></span><br><span class="line"><span class="function">// <span class="title">Process</span> <span class="title">specifies</span> <span class="title">the</span> <span class="title">configuration</span> <span class="title">and</span> <span class="title">IO</span> <span class="title">for</span> <span class="title">a</span> <span class="title">process</span> <span class="title">inside</span> <span class="title">a</span> <span class="title">container</span>.</span></span><br><span class="line"><span class="function"><span class="title">type</span> <span class="title">Process</span> <span class="title">struct</span></span> &#123;</span><br><span class="line">	<span class="comment">// The command to be run followed by any arguments.</span></span><br><span class="line">	Args []<span class="keyword">string</span></span><br><span class="line"></span><br><span class="line">	<span class="comment">// Env specifies the environment variables for the process.</span></span><br><span class="line">	Env []<span class="keyword">string</span></span><br><span class="line"></span><br><span class="line">	<span class="comment">// User will set the uid and gid of the executing process running inside the container</span></span><br><span class="line">	<span class="comment">// local to the container's user and group configuration.</span></span><br><span class="line">	User <span class="keyword">string</span></span><br><span class="line"></span><br><span class="line">	<span class="comment">// Cwd will change the processes current working directory inside the container's rootfs.</span></span><br><span class="line">	Cwd <span class="keyword">string</span></span><br><span class="line"></span><br><span class="line">	<span class="comment">// Stdin is a pointer to a reader which provides the standard input stream.</span></span><br><span class="line">	Stdin io.Reader</span><br><span class="line"></span><br><span class="line">	<span class="comment">// Stdout is a pointer to a writer which receives the standard output stream.</span></span><br><span class="line">	Stdout io.Writer</span><br><span class="line"></span><br><span class="line">	<span class="comment">// Stderr is a pointer to a writer which receives the standard error stream.</span></span><br><span class="line">	Stderr io.Writer</span><br><span class="line"></span><br><span class="line">	<span class="comment">// ExtraFiles specifies additional open files to be inherited by the container</span></span><br><span class="line">	ExtraFiles []*os.File</span><br><span class="line"></span><br><span class="line">	<span class="comment">// consolePath is the path to the console allocated to the container.</span></span><br><span class="line">	consolePath <span class="keyword">string</span></span><br><span class="line"></span><br><span class="line">	<span class="comment">// Capabilities specify the capabilities to keep when executing the process inside the container</span></span><br><span class="line">	<span class="comment">// All capabilities not specified will be dropped from the processes capability mask</span></span><br><span class="line">	Capabilities []<span class="keyword">string</span></span><br><span class="line"></span><br><span class="line">	ops processOperations</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">type</span> linuxContainer <span class="keyword">struct</span> &#123;</span><br><span class="line">	id            <span class="keyword">string</span></span><br><span class="line">	root          <span class="keyword">string</span></span><br><span class="line">	config        *configs.Config</span><br><span class="line">	cgroupManager cgroups.Manager</span><br><span class="line">	initPath      <span class="keyword">string</span></span><br><span class="line">	initArgs      []<span class="keyword">string</span></span><br><span class="line">	initProcess   parentProcess</span><br><span class="line">	criuPath      <span class="keyword">string</span></span><br><span class="line">	m             sync.Mutex</span><br><span class="line">	criuVersion   <span class="keyword">int</span></span><br><span class="line">	state         containerState</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>3 在loadFactory()中使用了InitArgs(os.Args[0],”init”)(l)来初始化container的执行入口。而l.InitPath = “/proc/self/exe”，即选择了自身的二进制作为进程创建的入口。</p>
+<p>4 newParentProcess()创建了一个PIPE作为runc start进程与container内部init进程通信管道。同时创建一个commandTemplate作为ParentProcess运行的模板，commandTemplate使用的是GO package中的os/exec库，见<a href="https://golang.org/pkg/os/exec/" target="_blank" rel="noopener">https://golang.org/pkg/os/exec/</a>,主要的结构为Cmd,封装了运行一个新的执行体所需要的各种环境。而namespace，filesystem及其它所需配置的运行环境信息都注册在了Cmd这个结构中。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> Cmd <span class="keyword">struct</span> &#123;</span><br><span class="line">        <span class="comment">// Path is the path of the command to run.</span></span><br><span class="line">        Path <span class="keyword">string</span></span><br><span class="line"></span><br><span class="line">        <span class="comment">// Args holds command line arguments, including the command as Args[0].</span></span><br><span class="line">        Args []<span class="keyword">string</span></span><br><span class="line"></span><br><span class="line">        <span class="comment">// Env specifies the environment of the process.</span></span><br><span class="line">        Env []<span class="keyword">string</span></span><br><span class="line"></span><br><span class="line">        <span class="comment">// Dir specifies the working directory of the command.</span></span><br><span class="line">        Dir <span class="keyword">string</span></span><br><span class="line"></span><br><span class="line">        Stdin io.Reader</span><br><span class="line">        Stdout io.Writer</span><br><span class="line">        Stderr io.Writer</span><br><span class="line"></span><br><span class="line">        ExtraFiles []*os.File</span><br><span class="line"></span><br><span class="line">        SysProcAttr *syscall.SysProcAttr</span><br><span class="line"></span><br><span class="line">        <span class="comment">// Process is the underlying process, once started.</span></span><br><span class="line">        Process *os.Process</span><br><span class="line"></span><br><span class="line">        ProcessState *os.ProcessState</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>5 通过parent.start()调用cmd.start()创建了新的进程。而此时新的进程使用/proc/self/exec作为执行入口，参数为”init”.Go语言中的init函数比较特殊,其会在main函数调用之前调用，所以在新的进程中func init()会直接调用，而不会去执行main函数。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">init</span><span class="params">()</span></span> &#123;</span><br><span class="line">	<span class="keyword">if</span> <span class="built_in">len</span>(os.Args) &gt; <span class="number">1</span> &amp;&amp; os.Args[<span class="number">1</span>] == <span class="string">"init"</span> &#123;</span><br><span class="line">		runtime.GOMAXPROCS(<span class="number">1</span>)</span><br><span class="line">		runtime.LockOSThread()</span><br><span class="line">		factory, _ := libcontainer.New(<span class="string">""</span>)</span><br><span class="line">		<span class="keyword">if</span> err := factory.StartInitialization(); err != <span class="literal">nil</span> &#123;</span><br><span class="line">			fatal(err)</span><br><span class="line">		&#125;</span><br><span class="line">		<span class="built_in">panic</span>(<span class="string">"--this line should have never been executed, congratulations--"</span>)</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>6 init()会从之前创建的pipe里读取父进程同步过来的配置进行初始化，初始化完成后会sync一个Ready的状态到父进程，父进程收到后同步一个此时子进程已经是在容器环境中了，最后container会调用system.Exec()执行用户在json文件中配置的binary。</p>
+<p>7 linuxStandardInit.init()是container内部进行初始化的主要函数,根据runc start进程发来的config进行初始化</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">setupNetwork</span><br><span class="line">setupRoute</span><br><span class="line">setupRlimits</span><br><span class="line">setOomScoreAdj</span><br><span class="line">setupRootfs</span><br><span class="line">Sethostname</span><br><span class="line">ApplyProfile</span><br><span class="line">SetProcessLabel</span><br><span class="line">remountReadonly</span><br><span class="line">maskFile</span><br></pre></td></tr></table></figure>
+<p>这样一个完整的container初始化完成并创建成功。后续我们再看libcontainer是如何对各个子模块进行初始化和配置的。</p>
+
+        
+        </div>
+        <footer class="article-footer">
+            <div class="share-container">
+
+
+
+</div>
+
+    <a data-url="http://royhunter.github.io/2016/02/03/runc-code-walk/" data-id="ck2oe6foo0032xkkv969bn17b" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+<script>
+    (function ($) {
+        // Prevent duplicate binding
+        if (typeof(__SHARE_BUTTON_BINDED__) === 'undefined' || !__SHARE_BUTTON_BINDED__) {
+            __SHARE_BUTTON_BINDED__ = true;
+        } else {
+            return;
+        }
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url'),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="fab fa-twitter article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="fab fa-facebook article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="fab fa-pinterest article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                            '<a href="https://plus.google.com/share?url=' + encodedUrl + '" class="fab fa-google article-share-google" target="_blank" title="Google+"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+            
+    
+
+        </footer>
+    </div>
+    
+        
+<nav id="article-nav">
+    
+        <a href="/2016/02/25/conhash/" id="article-nav-newer" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Newer</strong>
+            <div class="article-nav-title">
+                
+                    一致性哈希算法(Consistent Hashing)及Golang实现
+                
+            </div>
+        </a>
+    
+    
+        <a href="/2016/01/13/setup-pvt-docker-registry/" id="article-nav-older" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Older</strong>
+            <div class="article-nav-title">How to setup a private docker registry?</div>
+        </a>
+    
+</nav>
+
+
+    
+</article>
+
+
+    
+    
+
+</section>
+            
+                
+<aside id="sidebar">
+   
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">recent</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2020/07/12/index/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"></p>
+                            <p class="item-title"><a href="/2020/07/12/index/" class="title">Blog索引</a></p>
+                            <p class="item-date"><time datetime="2020-07-12T13:33:28.000Z" itemprop="datePublished">2020-07-12</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/07/17/ovs02-vxlan/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/07/17/ovs02-vxlan/" class="title">OVS02-VXLAN内核相关实现</a></p>
+                            <p class="item-date"><time datetime="2018-07-17T12:15:34.000Z" itemprop="datePublished">2018-07-17</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/01/10/perf-tunning/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/01/10/perf-tunning/" class="title">datapath性能优化总结</a></p>
+                            <p class="item-date"><time datetime="2018-01-10T13:26:32.000Z" itemprop="datePublished">2018-01-10</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2017/04/18/ovs01/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2017/04/18/ovs01/" class="title">OVS01-OVS基础-安装、配置、Simple Case</a></p>
+                            <p class="item-date"><time datetime="2017-04-18T13:26:32.000Z" itemprop="datePublished">2017-04-18</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2016/08/28/trampolines-for-nested-functions/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Programme/">Programme</a></p>
+                            <p class="item-title"><a href="/2016/08/28/trampolines-for-nested-functions/" class="title">Trampolines for Nested Functions in GCC</a></p>
+                            <p class="item-date"><time datetime="2016-08-28T13:26:32.000Z" itemprop="datePublished">2016-08-28</time></p>
+                        </div>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">categories</h3>
+        <div class="widget">
+            <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Algorithm/">Algorithm</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Container/">Container</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Docker/">Docker</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Hyper-V/">Hyper-V</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/KVM/">KVM</a><span class="category-list-count">22</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Misc/">Misc</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/PROGRAMME/">PROGRAMME</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Programme/">Programme</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Virtualization/">Virtualization</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/go/">go</a><span class="category-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">archives</h3>
+        <div class="widget">
+            <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">July 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">July 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">January 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">April 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">August 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/06/">June 2016</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/05/">May 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/03/">March 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/02/">February 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/01/">January 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/12/">December 2015</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/11/">November 2015</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/08/">August 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/07/">July 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/06/">June 2014</a><span class="archive-list-count">5</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tags</h3>
+        <div class="widget">
+            <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Container/">Container</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Distribute/">Distribute</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/EPT/">EPT</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux-namespace/">Linux namespace</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Network/">Network</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/PROGRAMME/">PROGRAMME</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Programme-Language/">Programme Language</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/QEMU/">QEMU</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Tools/">Tools</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization/">Virtualization</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization-KVM-QEMU/">Virtualization KVM QEMU</a><span class="tag-list-count">9</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/libvirt/">libvirt</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vhost/">vhost</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/virtio/">virtio</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vps-proxy/">vps_proxy</a><span class="tag-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tag cloud</h3>
+        <div class="widget tagcloud">
+            <a href="/tags/Container/" style="font-size: 12.5px;">Container</a> <a href="/tags/Distribute/" style="font-size: 12.5px;">Distribute</a> <a href="/tags/EPT/" style="font-size: 12.5px;">EPT</a> <a href="/tags/Linux-namespace/" style="font-size: 12.5px;">Linux namespace</a> <a href="/tags/Network/" style="font-size: 15px;">Network</a> <a href="/tags/PROGRAMME/" style="font-size: 10px;">PROGRAMME</a> <a href="/tags/Programme-Language/" style="font-size: 10px;">Programme Language</a> <a href="/tags/QEMU/" style="font-size: 12.5px;">QEMU</a> <a href="/tags/Tools/" style="font-size: 12.5px;">Tools</a> <a href="/tags/Virtualization/" style="font-size: 17.5px;">Virtualization</a> <a href="/tags/Virtualization-KVM-QEMU/" style="font-size: 20px;">Virtualization KVM QEMU</a> <a href="/tags/libvirt/" style="font-size: 10px;">libvirt</a> <a href="/tags/vhost/" style="font-size: 10px;">vhost</a> <a href="/tags/virtio/" style="font-size: 17.5px;">virtio</a> <a href="/tags/vps-proxy/" style="font-size: 10px;">vps_proxy</a>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">links</h3>
+        <div class="widget">
+            <ul>
+                
+                    <li>
+                        <a href="http://hexo.io">Hexo</a>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+
+    
+    <div id="toTop" class="fas fa-angle-up"></div>
+</aside>
+
+            
+        </div>
+        <footer id="footer">
+    <div class="outer">
+        <div id="footer-info" class="inner">
+            &copy; 2019 John Doe<br>
+            Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>. Theme by <a href="http://github.com/ppoffice">PPOffice</a>
+        </div>
+    </div>
+</footer>
+        
+
+
+    
+        <script src="/libs/lightgallery/js/lightgallery.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-thumbnail.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-pager.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-autoplay.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-fullscreen.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-zoom.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-hash.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-share.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-video.min.js"></script>
+    
+    
+        <script src="/libs/justified-gallery/jquery.justifiedGallery.min.js"></script>
+    
+    
+
+
+
+<!-- Custom Scripts -->
+<script src="/js/main.js"></script>
+
+    </div>
+</body>
+</html>

@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <meta charset="utf-8">
+    
+    <title>Vhost Architecture | RoyLuo&#39;s Notes</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="description" content="在前面的文章中在介绍virtio机制中，可以看到在通常的应用中一般使用QEMU用户态程序来模拟I/O访问，而Guest中的数据要通过Guest到Host Userspace的第一次拷贝，再经过Host userspace的第二次拷贝，这种多次的数据拷贝和CPU特权级的切换对性能有相当大的影响。为加速virtio设备的I/O性能，VHOST通过driver的形式在Host Kernel中直接实现了v">
+<meta name="keywords" content="vhost">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Vhost Architecture">
+<meta property="og:url" content="http://royhunter.github.io/2014/08/22/vhost/index.html">
+<meta property="og:site_name" content="RoyLuo&#39;s Notes">
+<meta property="og:description" content="在前面的文章中在介绍virtio机制中，可以看到在通常的应用中一般使用QEMU用户态程序来模拟I/O访问，而Guest中的数据要通过Guest到Host Userspace的第一次拷贝，再经过Host userspace的第二次拷贝，这种多次的数据拷贝和CPU特权级的切换对性能有相当大的影响。为加速virtio设备的I/O性能，VHOST通过driver的形式在Host Kernel中直接实现了v">
+<meta property="og:locale" content="en">
+<meta property="og:image" content="http://7mnoef.com1.z0.glb.clouddn.com/1.png">
+<meta property="og:image" content="http://7mnoef.com1.z0.glb.clouddn.com/2.png">
+<meta property="og:image" content="http://7mnoef.com1.z0.glb.clouddn.com/3.png">
+<meta property="og:image" content="http://7mnoef.com1.z0.glb.clouddn.com/4.png">
+<meta property="og:image" content="http://7mnoef.com1.z0.glb.clouddn.com/5.png">
+<meta property="og:image" content="http://7mnoef.com1.z0.glb.clouddn.com/6.png">
+<meta property="og:updated_time" content="2015-08-04T14:00:26.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Vhost Architecture">
+<meta name="twitter:description" content="在前面的文章中在介绍virtio机制中，可以看到在通常的应用中一般使用QEMU用户态程序来模拟I/O访问，而Guest中的数据要通过Guest到Host Userspace的第一次拷贝，再经过Host userspace的第二次拷贝，这种多次的数据拷贝和CPU特权级的切换对性能有相当大的影响。为加速virtio设备的I/O性能，VHOST通过driver的形式在Host Kernel中直接实现了v">
+<meta name="twitter:image" content="http://7mnoef.com1.z0.glb.clouddn.com/1.png">
+    
+
+    
+        <link rel="alternate" href="atom.xml" title="RoyLuo&#39;s Notes" type="application/atom+xml" />
+    
+
+    
+
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fontawesome.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-brands.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-solid.min.css">
+    <link rel="stylesheet" href="/libs/open-sans/styles.css">
+    <link rel="stylesheet" href="/libs/source-code-pro/styles.css">
+
+    <link rel="stylesheet" href="/css/style.css">
+
+    <script src="/libs/jquery/2.1.3/jquery.min.js"></script>
+    
+    
+        <link rel="stylesheet" href="/libs/lightgallery/css/lightgallery.min.css">
+    
+    
+        <link rel="stylesheet" href="/libs/justified-gallery/justifiedGallery.min.css">
+    
+    
+    
+    
+
+
+</head>
+
+<body>
+    <div id="container">
+        <header id="header">
+    <div id="header-main" class="header-inner">
+        <div class="outer">
+            <a href="/" id="logo">
+                <i class="logo"></i>
+                <span class="site-title">RoyLuo&#39;s Notes</span>
+            </a>
+            <nav id="main-nav">
+                
+                    <a class="main-nav-link" href="/.">Home</a>
+                
+                    <a class="main-nav-link" href="/archives">Archives</a>
+                
+                    <a class="main-nav-link" href="/categories">Categories</a>
+                
+                    <a class="main-nav-link" href="/tags">Tags</a>
+                
+                    <a class="main-nav-link" href="/proj">Projects</a>
+                
+                    <a class="main-nav-link" href="/book">Books</a>
+                
+                    <a class="main-nav-link" href="/about">About</a>
+                
+            </nav>
+            
+                
+                <nav id="sub-nav">
+                    <div class="profile" id="profile-nav">
+                        <a id="profile-anchor" href="javascript:;">
+                            <img class="avatar" src="/css/images/image_y.png" />
+                            <i class="fas fa-caret-down"></i>
+                        </a>
+                    </div>
+                </nav>
+            
+            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+        <button type="submit" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" placeholder="Type something..." />
+            <span class="ins-close ins-selectable"><i class="fas fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script>
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: 'Posts',
+            PAGES: 'Pages',
+            CATEGORIES: 'Categories',
+            TAGS: 'Tags',
+            UNTITLED: '(Untitled)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+<script src="/js/insight.js"></script>
+
+</div>
+        </div>
+    </div>
+    <div id="main-nav-mobile" class="header-sub header-inner">
+        <table class="menu outer">
+            <tr>
+                
+                    <td><a class="main-nav-link" href="/.">Home</a></td>
+                
+                    <td><a class="main-nav-link" href="/archives">Archives</a></td>
+                
+                    <td><a class="main-nav-link" href="/categories">Categories</a></td>
+                
+                    <td><a class="main-nav-link" href="/tags">Tags</a></td>
+                
+                    <td><a class="main-nav-link" href="/proj">Projects</a></td>
+                
+                    <td><a class="main-nav-link" href="/book">Books</a></td>
+                
+                    <td><a class="main-nav-link" href="/about">About</a></td>
+                
+                <td>
+                    
+    <div class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+    </div>
+
+                </td>
+            </tr>
+        </table>
+    </div>
+</header>
+
+        <div class="outer">
+            
+                
+
+<aside id="profile" class="profile-fixed">
+    <div class="inner profile-inner">
+        <div class="base-info profile-block">
+            <img id="avatar" src="/css/images/image_y.png" />
+            <h2 id="name">Roy Luo</h2>
+            <h3 id="title">Designer &amp; Developer</h3>
+            <span id="location"><i class="fas fa-map-marker-alt" style="padding-right: 5px"></i>Beijing, China</span>
+            <a id="follow" target="_blank" href="https://github.com/royhunter/">FOLLOW</a>
+        </div>
+        <div class="article-info profile-block">
+            <div class="article-info-block">
+                43
+                <span>posts</span>
+            </div>
+            <div class="article-info-block">
+                15
+                <span>tags</span>
+            </div>
+        </div>
+        
+        <div class="profile-block social-links">
+            <table>
+                <tr>
+                    
+                    
+                    <td>
+                        <a href="http://github.com/royhunter/" target="_blank" title="github" class=tooltip>
+                            <i class="fab fa-github"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://twitter.com/RoyLuoye" target="_blank" title="twitter" class=tooltip>
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://www.facebook/roy.luo.3367" target="_blank" title="facebook" class=tooltip>
+                            <i class="fab fa-facebook"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://cn.linkedin.com/in/royluoye" target="_blank" title="linkedin" class=tooltip>
+                            <i class="fab fa-linkedin"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="/atom.xml" target="_blank" title="rss" class=tooltip>
+                            <i class="fab fa-rss"></i>
+                        </a>
+                    </td>
+                    
+                </tr>
+            </table>
+        </div>
+        
+    </div>
+</aside>
+
+            
+            <section id="main"><article id="post-vhost" class="article article-type-post" itemscope itemprop="blogPost">
+    <div class="article-inner">
+        
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+            Vhost Architecture
+        </h1>
+    
+
+                
+                    <div class="article-meta">
+                        
+    <div class="article-date">
+        <i class="fas fa-calendar-alt"></i>
+        <a href="/2014/08/22/vhost/">
+            <time datetime="2014-08-22T12:51:46.000Z" itemprop="datePublished">2014-08-22</time>
+        </a>
+    </div>
+
+
+                        
+    <div class="article-category">
+    	<i class="fas fa-folder"></i>
+        <a class="article-category-link" href="/categories/KVM/">KVM</a>
+    </div>
+
+                        
+    <div class="article-tag">
+        <i class="fas fa-tag"></i>
+        <a class="tag-link" href="/tags/vhost/">vhost</a>
+    </div>
+
+                    </div>
+                
+            </header>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+        
+            
+            <p>在前面的文章中在介绍virtio机制中，可以看到在通常的应用中一般使用QEMU用户态程序来模拟I/O访问，而Guest中的数据要通过Guest到Host Userspace的第一次拷贝，再经过Host userspace的第二次拷贝，这种多次的数据拷贝和CPU特权级的切换对性能有相当大的影响。为加速virtio设备的I/O性能，VHOST通过driver的形式在Host Kernel中直接实现了virtio设备的模拟。通过在Host Kernel中对virtios设备的模拟运行允许Guest与Host Kernel直接进行数据交换，从而避免了用户空间的system call与数据拷贝的性能消耗。</p>
+<a id="more"></a>
+<h2 id="Vhost的初始化"><a href="#Vhost的初始化" class="headerlink" title="Vhost的初始化"></a>Vhost的初始化</h2><h3 id="Qemu层"><a href="#Qemu层" class="headerlink" title="Qemu层"></a>Qemu层</h3><p>vhost_net的启用是在命令行的-netdev tap,…中指定vhost=on选项，其初始化流程如下:</p>
+<ol>
+<li>根据“Qemu之Network Device全虚拟方案一：前端网络流的建立”一文中，tap设备的创建会调用到net_init_tap()函数；</li>
+<li>net_init_tap()其中会检查选项是否指定vhost=on，如果指定，则会调用到vhost_net_init()进行初始化；</li>
+<li>通过open(“/dev/vhost-net”, O_RDWR)打开了vhost driver；并通过ioctl(vhost_fd)进行了一系列的初始化；</li>
+<li>调用ioctl VHOST_SET_VRING_KICK 设置kick fd(guest -&gt; vhost) (VirtQueue.host_notifier.fd);</li>
+<li>调用ioctl VHOST_SET_VRING_CALL 设置call fd(vhost -&gt; guest) (VirtQueue.guest_notifier.fd);</li>
+</ol>
+<h3 id="Kernel层"><a href="#Kernel层" class="headerlink" title="Kernel层"></a>Kernel层</h3><p>vhost在kernel中是miscdevice的形态存在的：</p>
+<pre><code>static const struct file_operations vhost_net_fops = {
+    .owner          = THIS_MODULE,
+    .release        = vhost_net_release,
+    .unlocked_ioctl = vhost_net_ioctl,
+#ifdef CONFIG_COMPAT
+    .compat_ioctl   = vhost_net_compat_ioctl,
+#endif
+    .open           = vhost_net_open,
+    .llseek        = noop_llseek,
+};
+static struct miscdevice vhost_net_misc = {
+    .minor = VHOST_NET_MINOR,
+    .name = &quot;vhost-net&quot;,
+    .fops = &amp;vhost_net_fops,
+};
+static int vhost_net_init(void)
+{
+    if (experimental_zcopytx)
+        vhost_net_enable_zcopy(VHOST_NET_VQ_TX);
+    return misc_register(&amp;vhost_net_misc);
+}
+module_init(vhost_net_init);
+</code></pre><p>在vhost_net_open()中对vhost进行了初始化，主要数据结构关系如下图:</p>
+<p><img src="http://7mnoef.com1.z0.glb.clouddn.com/1.png" alt=""></p>
+<p>在初始化过程中，vhost driver创建了一个名为“vhost-$pid”内核线程,$pid为Qemu的PID。这个内核线程被称为“vhost worker thread”，该worker thread的任务即为处理virtio的I/O事件。</p>
+<h3 id="Guest层"><a href="#Guest层" class="headerlink" title="Guest层"></a>Guest层</h3><p>在Guest启动后会调用/drivers/virtio/virtio.c中的virtio_dev_probe进行virtio设备的初始化，</p>
+<pre><code>static int virtio_dev_probe(struct device *_d)
+{
+    ......
+    drv-&gt;probe(dev);
+    ......
+    add_status(dev, VIRTIO_CONFIG_S_DRIVER_OK);  
+    ......
+}
+</code></pre><p>drv-&gt;probe()即virtnet_probe(),其中对vq进行了初始化，此过程与前文中的virtio设备正常初始化过程一致，同时将vq的相关信息通告给了前端，Qemu接管后对vq的信息进行了记录，最后Qemu最终调用到vhost_net_start()将vq的配置下发到vhost中：</p>
+<ol>
+<li>ioctl VHOST_SET_VRING_NUM 设置vringsize；</li>
+<li>ioctl VHOST_SET_VRING_BASE 设置 (VirtQueue.last_avail_idx)；</li>
+<li>设置vhost_virtqueue中ring相关的成员(desc,avail, used_size, used_phys, used,<br>ring_size, ring_phys,ring)；</li>
+<li>调用vhost_virtqueue_set_addr设置相关地址；</li>
+</ol>
+<p>这样Virtio的vring空间就映射到了Host的Kernel中。</p>
+<p>三者之间的关系如下：</p>
+<p><img src="http://7mnoef.com1.z0.glb.clouddn.com/2.png" alt=""></p>
+<h2 id="vhost的运行"><a href="#vhost的运行" class="headerlink" title="vhost的运行"></a>vhost的运行</h2><p>在上图中可以看到vhost和kvm是两个独立的运行模块，对于Guest来说，vhost并没有模拟一个完整的PCI适配器。它内部只涉及了virtqueue的操作，而virtio设备的适配模拟仍然由Qemu来负责。所以在vhost的整个架构中，其并不是一个完整的virtio设备实现，它依赖于用户空间的管理平面处理，而自身完成位于Host Kernel层的数据面处理。<br>vhost与kvm的事件通信通过eventfd机制来实现，主要包括两个方向的event，一个是Guest到Vhost方向的kick event，通过ioeventfd承载；另一个是Vhost到Guest方向的call event，通过irqfd承载。</p>
+<h3 id="guest-notifier的使用"><a href="#guest-notifier的使用" class="headerlink" title="guest_notifier的使用"></a>guest_notifier的使用</h3><ol>
+<li>vhost在处理完请求（收到数据包)，将buffer放到used ring上面之后，往call fd里面写入;</li>
+<li>如果成功设置了irqfd，则kvm会直接中断guest。如果没有成功设置，则走以下的路径：</li>
+<li>Qemu通过select调用监听到该事件(因为vhost的callfd就是qemu里面对应vq的guest_notifier，它<br>已经被加入到selectablefd列表)；</li>
+<li>调用virtio_pci_guest_notifier_read通知guest；</li>
+<li>guest从used ring上获取相关的数据；</li>
+</ol>
+<p>过程如图：</p>
+<p><img src="http://7mnoef.com1.z0.glb.clouddn.com/3.png" alt=""></p>
+<h3 id="host-notifier的使用"><a href="#host-notifier的使用" class="headerlink" title="host_notifier的使用"></a>host_notifier的使用</h3><ol>
+<li>Guest中的virtio设备将数据放入avail ring上面后，写发送命令至virtio pci配置空间；</li>
+<li>Qemu截获寄存器的访问，调用注册的kvm_memory_listener中的eventfd_add回调函数kvm_eventfd_add<br>()；</li>
+<li>通过kvm_vm_ioctl(kvm_state, KVM_IOEVENTFD, &amp;kick)进入kvm中；</li>
+<li>kvm唤醒挂载在ioeventfd上vhost worker thread；</li>
+<li>vhost worker thread从avail ring上获取相关数据。</li>
+</ol>
+<p>kvm相关流程如图：</p>
+<p><img src="http://7mnoef.com1.z0.glb.clouddn.com/4.png" alt=""></p>
+<p>vhost中数据结构关系与函数调用流程如下图：</p>
+<p><img src="http://7mnoef.com1.z0.glb.clouddn.com/5.png" alt=""></p>
+<h2 id="数据发送的完整流程"><a href="#数据发送的完整流程" class="headerlink" title="数据发送的完整流程"></a>数据发送的完整流程</h2><p>在上面过程中可以看到vhost最核心处就在于将Guest中的virtio用于传输层的vring队列空间通过mapping方式与Host Kernel进行了共享，这样数据就不需要通过多次的跨态拷贝，直接进入了Kernel；通过io event事件机制进行了收发方向的通告，使vhost与Guest达到很好的配合。</p>
+<p>而数据在kernel中最终是如何发送出去的呢？</p>
+<p>看如下的图就明白了，在vhost的使能时，我们创建了tap，tap设备的用法和前文介绍的一致，通过加入Bridge来实现数据的交换。而vhost中的数据直接使用tap设备在内核中的sock接口进行了发送和接收，这些动作均是在vhost的worker thread中进行的。</p>
+<p><img src="http://7mnoef.com1.z0.glb.clouddn.com/6.png" alt=""></p>
+<h2 id="相关code"><a href="#相关code" class="headerlink" title="相关code"></a>相关code</h2><h3 id="Kernel相关"><a href="#Kernel相关" class="headerlink" title="Kernel相关"></a>Kernel相关</h3><ul>
+<li>drivers/vhost/vhost.c - common vhost driver code</li>
+<li>drivers/vhost/net.c - vhost-net driver</li>
+<li>virt/kvm/eventfd.c - ioeventfd and irqfd</li>
+</ul>
+<h3 id="Qemu相关"><a href="#Qemu相关" class="headerlink" title="Qemu相关"></a>Qemu相关</h3><ul>
+<li>hw/vhost.c - common vhost initialization code</li>
+<li>hw/vhost_net.c - vhost-net initialization</li>
+</ul>
+
+        
+        </div>
+        <footer class="article-footer">
+            <div class="share-container">
+
+
+
+</div>
+
+    <a data-url="http://royhunter.github.io/2014/08/22/vhost/" data-id="ck2oe6fqj003wxkkvtmf89pin" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+<script>
+    (function ($) {
+        // Prevent duplicate binding
+        if (typeof(__SHARE_BUTTON_BINDED__) === 'undefined' || !__SHARE_BUTTON_BINDED__) {
+            __SHARE_BUTTON_BINDED__ = true;
+        } else {
+            return;
+        }
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url'),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="fab fa-twitter article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="fab fa-facebook article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="fab fa-pinterest article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                            '<a href="https://plus.google.com/share?url=' + encodedUrl + '" class="fab fa-google article-share-google" target="_blank" title="Google+"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+            
+    
+
+        </footer>
+    </div>
+    
+        
+<nav id="article-nav">
+    
+        <a href="/2014/08/29/virtio-blk/" id="article-nav-newer" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Newer</strong>
+            <div class="article-nav-title">
+                
+                    Virtio-Blk浅析
+                
+            </div>
+        </a>
+    
+    
+        <a href="/2014/08/09/virtio-netdev-send/" id="article-nav-older" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Older</strong>
+            <div class="article-nav-title">Virtio----Virtio Netdev Packet Process</div>
+        </a>
+    
+</nav>
+
+
+    
+</article>
+
+
+    
+    
+
+</section>
+            
+                
+<aside id="sidebar">
+   
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">recent</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2020/07/12/index/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"></p>
+                            <p class="item-title"><a href="/2020/07/12/index/" class="title">Blog索引</a></p>
+                            <p class="item-date"><time datetime="2020-07-12T13:33:28.000Z" itemprop="datePublished">2020-07-12</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/07/17/ovs02-vxlan/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/07/17/ovs02-vxlan/" class="title">OVS02-VXLAN内核相关实现</a></p>
+                            <p class="item-date"><time datetime="2018-07-17T12:15:34.000Z" itemprop="datePublished">2018-07-17</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/01/10/perf-tunning/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/01/10/perf-tunning/" class="title">datapath性能优化总结</a></p>
+                            <p class="item-date"><time datetime="2018-01-10T13:26:32.000Z" itemprop="datePublished">2018-01-10</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2017/04/18/ovs01/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2017/04/18/ovs01/" class="title">OVS01-OVS基础-安装、配置、Simple Case</a></p>
+                            <p class="item-date"><time datetime="2017-04-18T13:26:32.000Z" itemprop="datePublished">2017-04-18</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2016/08/28/trampolines-for-nested-functions/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Programme/">Programme</a></p>
+                            <p class="item-title"><a href="/2016/08/28/trampolines-for-nested-functions/" class="title">Trampolines for Nested Functions in GCC</a></p>
+                            <p class="item-date"><time datetime="2016-08-28T13:26:32.000Z" itemprop="datePublished">2016-08-28</time></p>
+                        </div>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">categories</h3>
+        <div class="widget">
+            <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Algorithm/">Algorithm</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Container/">Container</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Docker/">Docker</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Hyper-V/">Hyper-V</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/KVM/">KVM</a><span class="category-list-count">22</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Misc/">Misc</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/PROGRAMME/">PROGRAMME</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Programme/">Programme</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Virtualization/">Virtualization</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/go/">go</a><span class="category-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">archives</h3>
+        <div class="widget">
+            <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">July 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">July 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">January 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">April 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">August 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/06/">June 2016</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/05/">May 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/03/">March 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/02/">February 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/01/">January 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/12/">December 2015</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/11/">November 2015</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/08/">August 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/07/">July 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/06/">June 2014</a><span class="archive-list-count">5</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tags</h3>
+        <div class="widget">
+            <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Container/">Container</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Distribute/">Distribute</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/EPT/">EPT</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux-namespace/">Linux namespace</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Network/">Network</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/PROGRAMME/">PROGRAMME</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Programme-Language/">Programme Language</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/QEMU/">QEMU</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Tools/">Tools</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization/">Virtualization</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization-KVM-QEMU/">Virtualization KVM QEMU</a><span class="tag-list-count">9</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/libvirt/">libvirt</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vhost/">vhost</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/virtio/">virtio</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vps-proxy/">vps_proxy</a><span class="tag-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tag cloud</h3>
+        <div class="widget tagcloud">
+            <a href="/tags/Container/" style="font-size: 12.5px;">Container</a> <a href="/tags/Distribute/" style="font-size: 12.5px;">Distribute</a> <a href="/tags/EPT/" style="font-size: 12.5px;">EPT</a> <a href="/tags/Linux-namespace/" style="font-size: 12.5px;">Linux namespace</a> <a href="/tags/Network/" style="font-size: 15px;">Network</a> <a href="/tags/PROGRAMME/" style="font-size: 10px;">PROGRAMME</a> <a href="/tags/Programme-Language/" style="font-size: 10px;">Programme Language</a> <a href="/tags/QEMU/" style="font-size: 12.5px;">QEMU</a> <a href="/tags/Tools/" style="font-size: 12.5px;">Tools</a> <a href="/tags/Virtualization/" style="font-size: 17.5px;">Virtualization</a> <a href="/tags/Virtualization-KVM-QEMU/" style="font-size: 20px;">Virtualization KVM QEMU</a> <a href="/tags/libvirt/" style="font-size: 10px;">libvirt</a> <a href="/tags/vhost/" style="font-size: 10px;">vhost</a> <a href="/tags/virtio/" style="font-size: 17.5px;">virtio</a> <a href="/tags/vps-proxy/" style="font-size: 10px;">vps_proxy</a>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">links</h3>
+        <div class="widget">
+            <ul>
+                
+                    <li>
+                        <a href="http://hexo.io">Hexo</a>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+
+    
+    <div id="toTop" class="fas fa-angle-up"></div>
+</aside>
+
+            
+        </div>
+        <footer id="footer">
+    <div class="outer">
+        <div id="footer-info" class="inner">
+            &copy; 2019 John Doe<br>
+            Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>. Theme by <a href="http://github.com/ppoffice">PPOffice</a>
+        </div>
+    </div>
+</footer>
+        
+
+
+    
+        <script src="/libs/lightgallery/js/lightgallery.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-thumbnail.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-pager.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-autoplay.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-fullscreen.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-zoom.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-hash.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-share.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-video.min.js"></script>
+    
+    
+        <script src="/libs/justified-gallery/jquery.justifiedGallery.min.js"></script>
+    
+    
+
+
+
+<!-- Custom Scripts -->
+<script src="/js/main.js"></script>
+
+    </div>
+</body>
+</html>

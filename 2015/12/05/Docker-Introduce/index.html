@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <meta charset="utf-8">
+    
+    <title>Docker Introduce | RoyLuo&#39;s Notes</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="description" content="Docker最近这几年成为了虚拟化领域炙手可热的话题，发展也极为迅速，不同于KVM的OS级虚拟化解决方案，Docker从容器级虚拟化技术角度提供了一个开放的，及其轻量级的虚拟化平台。  Docker helps you ship code faster, test faster, deploy faster, and shorten the cycle between writing code a">
+<meta name="keywords" content="Virtualization">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Docker Introduce">
+<meta property="og:url" content="http://royhunter.github.io/2015/12/05/Docker-Introduce/index.html">
+<meta property="og:site_name" content="RoyLuo&#39;s Notes">
+<meta property="og:description" content="Docker最近这几年成为了虚拟化领域炙手可热的话题，发展也极为迅速，不同于KVM的OS级虚拟化解决方案，Docker从容器级虚拟化技术角度提供了一个开放的，及其轻量级的虚拟化平台。  Docker helps you ship code faster, test faster, deploy faster, and shorten the cycle between writing code a">
+<meta property="og:locale" content="en">
+<meta property="og:image" content="http://7xoxkz.com1.z0.glb.clouddn.com/1.PNG">
+<meta property="og:updated_time" content="2015-12-05T13:25:48.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Docker Introduce">
+<meta name="twitter:description" content="Docker最近这几年成为了虚拟化领域炙手可热的话题，发展也极为迅速，不同于KVM的OS级虚拟化解决方案，Docker从容器级虚拟化技术角度提供了一个开放的，及其轻量级的虚拟化平台。  Docker helps you ship code faster, test faster, deploy faster, and shorten the cycle between writing code a">
+<meta name="twitter:image" content="http://7xoxkz.com1.z0.glb.clouddn.com/1.PNG">
+    
+
+    
+        <link rel="alternate" href="atom.xml" title="RoyLuo&#39;s Notes" type="application/atom+xml" />
+    
+
+    
+
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fontawesome.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-brands.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-solid.min.css">
+    <link rel="stylesheet" href="/libs/open-sans/styles.css">
+    <link rel="stylesheet" href="/libs/source-code-pro/styles.css">
+
+    <link rel="stylesheet" href="/css/style.css">
+
+    <script src="/libs/jquery/2.1.3/jquery.min.js"></script>
+    
+    
+        <link rel="stylesheet" href="/libs/lightgallery/css/lightgallery.min.css">
+    
+    
+        <link rel="stylesheet" href="/libs/justified-gallery/justifiedGallery.min.css">
+    
+    
+    
+    
+
+
+</head>
+
+<body>
+    <div id="container">
+        <header id="header">
+    <div id="header-main" class="header-inner">
+        <div class="outer">
+            <a href="/" id="logo">
+                <i class="logo"></i>
+                <span class="site-title">RoyLuo&#39;s Notes</span>
+            </a>
+            <nav id="main-nav">
+                
+                    <a class="main-nav-link" href="/.">Home</a>
+                
+                    <a class="main-nav-link" href="/archives">Archives</a>
+                
+                    <a class="main-nav-link" href="/categories">Categories</a>
+                
+                    <a class="main-nav-link" href="/tags">Tags</a>
+                
+                    <a class="main-nav-link" href="/proj">Projects</a>
+                
+                    <a class="main-nav-link" href="/book">Books</a>
+                
+                    <a class="main-nav-link" href="/about">About</a>
+                
+            </nav>
+            
+                
+                <nav id="sub-nav">
+                    <div class="profile" id="profile-nav">
+                        <a id="profile-anchor" href="javascript:;">
+                            <img class="avatar" src="/css/images/image_y.png" />
+                            <i class="fas fa-caret-down"></i>
+                        </a>
+                    </div>
+                </nav>
+            
+            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+        <button type="submit" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" placeholder="Type something..." />
+            <span class="ins-close ins-selectable"><i class="fas fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script>
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: 'Posts',
+            PAGES: 'Pages',
+            CATEGORIES: 'Categories',
+            TAGS: 'Tags',
+            UNTITLED: '(Untitled)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+<script src="/js/insight.js"></script>
+
+</div>
+        </div>
+    </div>
+    <div id="main-nav-mobile" class="header-sub header-inner">
+        <table class="menu outer">
+            <tr>
+                
+                    <td><a class="main-nav-link" href="/.">Home</a></td>
+                
+                    <td><a class="main-nav-link" href="/archives">Archives</a></td>
+                
+                    <td><a class="main-nav-link" href="/categories">Categories</a></td>
+                
+                    <td><a class="main-nav-link" href="/tags">Tags</a></td>
+                
+                    <td><a class="main-nav-link" href="/proj">Projects</a></td>
+                
+                    <td><a class="main-nav-link" href="/book">Books</a></td>
+                
+                    <td><a class="main-nav-link" href="/about">About</a></td>
+                
+                <td>
+                    
+    <div class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+    </div>
+
+                </td>
+            </tr>
+        </table>
+    </div>
+</header>
+
+        <div class="outer">
+            
+                
+
+<aside id="profile" class="profile-fixed">
+    <div class="inner profile-inner">
+        <div class="base-info profile-block">
+            <img id="avatar" src="/css/images/image_y.png" />
+            <h2 id="name">Roy Luo</h2>
+            <h3 id="title">Designer &amp; Developer</h3>
+            <span id="location"><i class="fas fa-map-marker-alt" style="padding-right: 5px"></i>Beijing, China</span>
+            <a id="follow" target="_blank" href="https://github.com/royhunter/">FOLLOW</a>
+        </div>
+        <div class="article-info profile-block">
+            <div class="article-info-block">
+                43
+                <span>posts</span>
+            </div>
+            <div class="article-info-block">
+                15
+                <span>tags</span>
+            </div>
+        </div>
+        
+        <div class="profile-block social-links">
+            <table>
+                <tr>
+                    
+                    
+                    <td>
+                        <a href="http://github.com/royhunter/" target="_blank" title="github" class=tooltip>
+                            <i class="fab fa-github"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://twitter.com/RoyLuoye" target="_blank" title="twitter" class=tooltip>
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://www.facebook/roy.luo.3367" target="_blank" title="facebook" class=tooltip>
+                            <i class="fab fa-facebook"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://cn.linkedin.com/in/royluoye" target="_blank" title="linkedin" class=tooltip>
+                            <i class="fab fa-linkedin"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="/atom.xml" target="_blank" title="rss" class=tooltip>
+                            <i class="fab fa-rss"></i>
+                        </a>
+                    </td>
+                    
+                </tr>
+            </table>
+        </div>
+        
+    </div>
+</aside>
+
+            
+            <section id="main"><article id="post-Docker-Introduce" class="article article-type-post" itemscope itemprop="blogPost">
+    <div class="article-inner">
+        
+            
+	
+		<img src="http://7xoxkz.com1.z0.glb.clouddn.com/1.PNG" class="article-banner" />
+	
+
+
+
+        
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+            Docker Introduce
+        </h1>
+    
+
+                
+                    <div class="article-meta">
+                        
+    <div class="article-date">
+        <i class="fas fa-calendar-alt"></i>
+        <a href="/2015/12/05/Docker-Introduce/">
+            <time datetime="2015-12-05T11:45:10.000Z" itemprop="datePublished">2015-12-05</time>
+        </a>
+    </div>
+
+
+                        
+    <div class="article-category">
+    	<i class="fas fa-folder"></i>
+        <a class="article-category-link" href="/categories/Docker/">Docker</a>
+    </div>
+
+                        
+    <div class="article-tag">
+        <i class="fas fa-tag"></i>
+        <a class="tag-link" href="/tags/Virtualization/">Virtualization</a>
+    </div>
+
+                    </div>
+                
+            </header>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+        
+            
+            <p>Docker最近这几年成为了虚拟化领域炙手可热的话题，发展也极为迅速，不同于KVM的OS级虚拟化解决方案，Docker从容器级虚拟化技术角度提供了一个开放的，及其轻量级的虚拟化平台。</p>
+<blockquote>
+<p>Docker helps you ship code faster, test faster, deploy faster, and shorten the cycle between writing code and running code.</p>
+</blockquote>
+<a id="more"></a> 
+<h2 id="What-is-Docker"><a href="#What-is-Docker" class="headerlink" title="What is Docker?"></a>What is Docker?</h2><p>在前面KVM的一系列的文章中，我们可以看到，KVM基于Linux内核资源，借助于硬件辅助虚拟化技术从OS级上提供了完整的虚拟化平台解决方案。而Docker从应用级别角度使用容器技术，隔离了容器的各自运行环境，成为了一个轻量级的虚拟化平台。<br>Docker提供了一种能力，使任何应用程序能够安全地隔离于其他应用在一个独立的容器中运行。 隔离与安全性可以使多个容器可以共同运行于Host。其轻量级的特性规避了hypervisor的运行消耗，从而可以充分利用硬件资源。</p>
+<p><img src="http://7xoxkz.com1.z0.glb.clouddn.com/2.PNG" alt=""></p>
+<p>在上图Virtual Machine与container平台对比中可以看到，Virtual Machine平台主要是通过Host上的hypervisor运行的多个Guest OS来达到运行环境的隔离性，而Container技术主要通过Container引擎来驱动隔离性，没有引入新的OS，减轻了系统的运行负担，使得上层应用程序可以直接复用Host OS的资源和功能，达到轻量级的运行特性。</p>
+<h2 id="Docker的优势"><a href="#Docker的优势" class="headerlink" title="Docker的优势"></a>Docker的优势</h2><ol>
+<li><p>更快的交付你的应用<br>Docker可以让一个团队工作成员各自工作在本地的容器中，并通过持续的集成和迭代加快开发速度，提高开发效率。这一特性很像代码版本的分布式控制系统，用过GIT进行代码管理的开发者应该对此更理解一些。</p>
+</li>
+<li><p>更容易的部署和扩展<br>Docker的容器封闭性可以更容易的部署在任意一台Linux系统上，而这Linux系统可以是一台真实的物理机，或者虚拟机，甚至是云平台。轻量级的特性支持容器的规模的扩展，充分利用每一台Physical Machine的Resource。</p>
+</li>
+<li><p>运行的效率<br>Docker支持应用程序直接运行于隔离的环境，复用host os的资源和功能，省去了hypervisor对Guest OS的繁琐的管理和运行开销，使应用更能达到一种实时运行的状态。</p>
+</li>
+</ol>
+<h2 id="Docker的架构"><a href="#Docker的架构" class="headerlink" title="Docker的架构"></a>Docker的架构</h2><p>Docker使用了CS架构，Docker Client与Docker Daemon进行交互，Daemon主要进行image的building,running和distributing.<br>Docker Client和Docker Daemon可以运行于同一系统中，或者Client与远程的Daemon进行通信，通信的接口使用socket或者RESTful API。</p>
+<p>在我本机上运行的是Ubuntu14.04，集成了Docker的安装包，所以可以直接安装：<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">root@royluo:~<span class="comment"># apt-get install -y docker.io</span></span><br></pre></td></tr></table></figure></p>
+<p>安装完启动后，可以看到系统中运行了docker daemon：<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">root@royluo:~<span class="comment"># ps aux|grep docker</span></span><br><span class="line">root     13971  1.5  1.8 235384  9156 ?        Ssl  07:53   0:00 /usr/bin/docker -d</span><br></pre></td></tr></table></figure></p>
+<p>由于Docker Client与Daemon共用的是同一个可执行文件，所以Daemon启动时加上-d选项。而Client直接使用docker命令。<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">root@royluo:~<span class="comment"># docker --help</span></span><br><span class="line">Usage: docker [OPTIONS] COMMAND [arg...]</span><br><span class="line"></span><br><span class="line">A self-sufficient runtime <span class="keyword">for</span> linux containers.</span><br><span class="line">......</span><br></pre></td></tr></table></figure></p>
+<p>摘自官网的一幅图：可以看到Client和Daemon的交互关系.<br><img src="http://7xoxkz.com1.z0.glb.clouddn.com/3.PNG" alt=""></p>
+<p>其中也说明了Docker的内部组成：</p>
+<h3 id="Docker-images"><a href="#Docker-images" class="headerlink" title="Docker images."></a>Docker images.</h3><p>一个Docker image是一个只读的模板，其包含了需要运行的应用所需的组件，例如库，可执行程序等，是一个静态的概念。</p>
+<h3 id="Docker-registries"><a href="#Docker-registries" class="headerlink" title="Docker registries."></a>Docker registries.</h3><p>我的理解是image的仓库，提供类似于Github的服务，其提供image的管理操作。</p>
+<h3 id="Docker-containers"><a href="#Docker-containers" class="headerlink" title="Docker containers."></a>Docker containers.</h3><p>Container就是一个运行的环境，可以create，run，start，stop，move，delete…</p>
+<h2 id="Docker背后的技术"><a href="#Docker背后的技术" class="headerlink" title="Docker背后的技术"></a>Docker背后的技术</h2><p>Docker是由GO语言开发，利用了Linux内核的一些特性：</p>
+<h3 id="Namespaces"><a href="#Namespaces" class="headerlink" title="Namespaces"></a>Namespaces</h3><p>Namespaces技术提供了container运行的隔离环境。</p>
+<h3 id="Control-groups"><a href="#Control-groups" class="headerlink" title="Control groups"></a>Control groups</h3><p>Cgroup技术提供了container运行的资源限制措施。</p>
+<h3 id="Union-file-systems"><a href="#Union-file-systems" class="headerlink" title="Union file systems"></a>Union file systems</h3><p>UFS提供了一种能够创建层级文件系统的功能。</p>
+<p>这些技术后面会一步步进行学习和分析。</p>
+<p>Ref: <a href="https://docs.docker.com/engine/introduction/understanding-docker/" target="_blank" rel="noopener">https://docs.docker.com/engine/introduction/understanding-docker/</a></p>
+
+        
+        </div>
+        <footer class="article-footer">
+            <div class="share-container">
+
+
+
+</div>
+
+    <a data-url="http://royhunter.github.io/2015/12/05/Docker-Introduce/" data-id="ck2oe6fn30000xkkv7x71r8ms" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+<script>
+    (function ($) {
+        // Prevent duplicate binding
+        if (typeof(__SHARE_BUTTON_BINDED__) === 'undefined' || !__SHARE_BUTTON_BINDED__) {
+            __SHARE_BUTTON_BINDED__ = true;
+        } else {
+            return;
+        }
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url'),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="fab fa-twitter article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="fab fa-facebook article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="fab fa-pinterest article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                            '<a href="https://plus.google.com/share?url=' + encodedUrl + '" class="fab fa-google article-share-google" target="_blank" title="Google+"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+            
+    
+
+        </footer>
+    </div>
+    
+        
+<nav id="article-nav">
+    
+        <a href="/2015/12/05/go-note/" id="article-nav-newer" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Newer</strong>
+            <div class="article-nav-title">
+                
+                    Learning notes for Golang
+                
+            </div>
+        </a>
+    
+    
+        <a href="/2015/11/20/interrupt-virtualization2/" id="article-nav-older" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Older</strong>
+            <div class="article-nav-title">中断虚拟化二</div>
+        </a>
+    
+</nav>
+
+
+    
+</article>
+
+
+    
+    
+
+</section>
+            
+                
+<aside id="sidebar">
+   
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">recent</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2020/07/12/index/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"></p>
+                            <p class="item-title"><a href="/2020/07/12/index/" class="title">Blog索引</a></p>
+                            <p class="item-date"><time datetime="2020-07-12T13:33:28.000Z" itemprop="datePublished">2020-07-12</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/07/17/ovs02-vxlan/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/07/17/ovs02-vxlan/" class="title">OVS02-VXLAN内核相关实现</a></p>
+                            <p class="item-date"><time datetime="2018-07-17T12:15:34.000Z" itemprop="datePublished">2018-07-17</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/01/10/perf-tunning/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/01/10/perf-tunning/" class="title">datapath性能优化总结</a></p>
+                            <p class="item-date"><time datetime="2018-01-10T13:26:32.000Z" itemprop="datePublished">2018-01-10</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2017/04/18/ovs01/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2017/04/18/ovs01/" class="title">OVS01-OVS基础-安装、配置、Simple Case</a></p>
+                            <p class="item-date"><time datetime="2017-04-18T13:26:32.000Z" itemprop="datePublished">2017-04-18</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2016/08/28/trampolines-for-nested-functions/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Programme/">Programme</a></p>
+                            <p class="item-title"><a href="/2016/08/28/trampolines-for-nested-functions/" class="title">Trampolines for Nested Functions in GCC</a></p>
+                            <p class="item-date"><time datetime="2016-08-28T13:26:32.000Z" itemprop="datePublished">2016-08-28</time></p>
+                        </div>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">categories</h3>
+        <div class="widget">
+            <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Algorithm/">Algorithm</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Container/">Container</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Docker/">Docker</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Hyper-V/">Hyper-V</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/KVM/">KVM</a><span class="category-list-count">22</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Misc/">Misc</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/PROGRAMME/">PROGRAMME</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Programme/">Programme</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Virtualization/">Virtualization</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/go/">go</a><span class="category-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">archives</h3>
+        <div class="widget">
+            <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">July 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">July 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">January 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">April 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">August 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/06/">June 2016</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/05/">May 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/03/">March 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/02/">February 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/01/">January 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/12/">December 2015</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/11/">November 2015</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/08/">August 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/07/">July 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/06/">June 2014</a><span class="archive-list-count">5</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tags</h3>
+        <div class="widget">
+            <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Container/">Container</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Distribute/">Distribute</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/EPT/">EPT</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux-namespace/">Linux namespace</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Network/">Network</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/PROGRAMME/">PROGRAMME</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Programme-Language/">Programme Language</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/QEMU/">QEMU</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Tools/">Tools</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization/">Virtualization</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization-KVM-QEMU/">Virtualization KVM QEMU</a><span class="tag-list-count">9</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/libvirt/">libvirt</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vhost/">vhost</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/virtio/">virtio</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vps-proxy/">vps_proxy</a><span class="tag-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tag cloud</h3>
+        <div class="widget tagcloud">
+            <a href="/tags/Container/" style="font-size: 12.5px;">Container</a> <a href="/tags/Distribute/" style="font-size: 12.5px;">Distribute</a> <a href="/tags/EPT/" style="font-size: 12.5px;">EPT</a> <a href="/tags/Linux-namespace/" style="font-size: 12.5px;">Linux namespace</a> <a href="/tags/Network/" style="font-size: 15px;">Network</a> <a href="/tags/PROGRAMME/" style="font-size: 10px;">PROGRAMME</a> <a href="/tags/Programme-Language/" style="font-size: 10px;">Programme Language</a> <a href="/tags/QEMU/" style="font-size: 12.5px;">QEMU</a> <a href="/tags/Tools/" style="font-size: 12.5px;">Tools</a> <a href="/tags/Virtualization/" style="font-size: 17.5px;">Virtualization</a> <a href="/tags/Virtualization-KVM-QEMU/" style="font-size: 20px;">Virtualization KVM QEMU</a> <a href="/tags/libvirt/" style="font-size: 10px;">libvirt</a> <a href="/tags/vhost/" style="font-size: 10px;">vhost</a> <a href="/tags/virtio/" style="font-size: 17.5px;">virtio</a> <a href="/tags/vps-proxy/" style="font-size: 10px;">vps_proxy</a>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">links</h3>
+        <div class="widget">
+            <ul>
+                
+                    <li>
+                        <a href="http://hexo.io">Hexo</a>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+
+    
+    <div id="toTop" class="fas fa-angle-up"></div>
+</aside>
+
+            
+        </div>
+        <footer id="footer">
+    <div class="outer">
+        <div id="footer-info" class="inner">
+            &copy; 2019 John Doe<br>
+            Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>. Theme by <a href="http://github.com/ppoffice">PPOffice</a>
+        </div>
+    </div>
+</footer>
+        
+
+
+    
+        <script src="/libs/lightgallery/js/lightgallery.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-thumbnail.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-pager.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-autoplay.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-fullscreen.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-zoom.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-hash.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-share.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-video.min.js"></script>
+    
+    
+        <script src="/libs/justified-gallery/jquery.justifiedGallery.min.js"></script>
+    
+    
+
+
+
+<!-- Custom Scripts -->
+<script src="/js/main.js"></script>
+
+    </div>
+</body>
+</html>

@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <meta charset="utf-8">
+    
+    <title>Qemu之Network Device全虚拟方案一:前端网络流的建立 | RoyLuo&#39;s Notes</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="description" content="KVM在I/O虚拟化方面，传统的方式是使用Qemu纯软件的方式来模拟I/O设备，其中包括经常使用的网卡设备。这次我们重点分析Qemu为实现网络设备虚拟化的全虚拟化方案。本主题从三个组成方面来完整描述，包括：1. 前端网络流的建立； 2. 虚拟网卡的创建； 3. 网络I/O虚拟化 in Guest OS。本篇主要讲述“前端网络流的建立”。">
+<meta name="keywords" content="Virtualization KVM QEMU">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Qemu之Network Device全虚拟方案一:前端网络流的建立">
+<meta property="og:url" content="http://royhunter.github.io/2014/07/17/netdev-virtual-1/index.html">
+<meta property="og:site_name" content="RoyLuo&#39;s Notes">
+<meta property="og:description" content="KVM在I/O虚拟化方面，传统的方式是使用Qemu纯软件的方式来模拟I/O设备，其中包括经常使用的网卡设备。这次我们重点分析Qemu为实现网络设备虚拟化的全虚拟化方案。本主题从三个组成方面来完整描述，包括：1. 前端网络流的建立； 2. 虚拟网卡的创建； 3. 网络I/O虚拟化 in Guest OS。本篇主要讲述“前端网络流的建立”。">
+<meta property="og:locale" content="en">
+<meta property="og:image" content="http://7ktrxu.com1.z0.glb.clouddn.com/1.png">
+<meta property="og:image" content="http://7ktrxu.com1.z0.glb.clouddn.com/2.png">
+<meta property="og:image" content="http://7ktrxu.com1.z0.glb.clouddn.com/3.png">
+<meta property="og:updated_time" content="2016-06-25T04:05:06.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Qemu之Network Device全虚拟方案一:前端网络流的建立">
+<meta name="twitter:description" content="KVM在I/O虚拟化方面，传统的方式是使用Qemu纯软件的方式来模拟I/O设备，其中包括经常使用的网卡设备。这次我们重点分析Qemu为实现网络设备虚拟化的全虚拟化方案。本主题从三个组成方面来完整描述，包括：1. 前端网络流的建立； 2. 虚拟网卡的创建； 3. 网络I/O虚拟化 in Guest OS。本篇主要讲述“前端网络流的建立”。">
+<meta name="twitter:image" content="http://7ktrxu.com1.z0.glb.clouddn.com/1.png">
+    
+
+    
+        <link rel="alternate" href="atom.xml" title="RoyLuo&#39;s Notes" type="application/atom+xml" />
+    
+
+    
+
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fontawesome.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-brands.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-solid.min.css">
+    <link rel="stylesheet" href="/libs/open-sans/styles.css">
+    <link rel="stylesheet" href="/libs/source-code-pro/styles.css">
+
+    <link rel="stylesheet" href="/css/style.css">
+
+    <script src="/libs/jquery/2.1.3/jquery.min.js"></script>
+    
+    
+        <link rel="stylesheet" href="/libs/lightgallery/css/lightgallery.min.css">
+    
+    
+        <link rel="stylesheet" href="/libs/justified-gallery/justifiedGallery.min.css">
+    
+    
+    
+    
+
+
+</head>
+
+<body>
+    <div id="container">
+        <header id="header">
+    <div id="header-main" class="header-inner">
+        <div class="outer">
+            <a href="/" id="logo">
+                <i class="logo"></i>
+                <span class="site-title">RoyLuo&#39;s Notes</span>
+            </a>
+            <nav id="main-nav">
+                
+                    <a class="main-nav-link" href="/.">Home</a>
+                
+                    <a class="main-nav-link" href="/archives">Archives</a>
+                
+                    <a class="main-nav-link" href="/categories">Categories</a>
+                
+                    <a class="main-nav-link" href="/tags">Tags</a>
+                
+                    <a class="main-nav-link" href="/proj">Projects</a>
+                
+                    <a class="main-nav-link" href="/book">Books</a>
+                
+                    <a class="main-nav-link" href="/about">About</a>
+                
+            </nav>
+            
+                
+                <nav id="sub-nav">
+                    <div class="profile" id="profile-nav">
+                        <a id="profile-anchor" href="javascript:;">
+                            <img class="avatar" src="/css/images/image_y.png" />
+                            <i class="fas fa-caret-down"></i>
+                        </a>
+                    </div>
+                </nav>
+            
+            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+        <button type="submit" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" placeholder="Type something..." />
+            <span class="ins-close ins-selectable"><i class="fas fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script>
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: 'Posts',
+            PAGES: 'Pages',
+            CATEGORIES: 'Categories',
+            TAGS: 'Tags',
+            UNTITLED: '(Untitled)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+<script src="/js/insight.js"></script>
+
+</div>
+        </div>
+    </div>
+    <div id="main-nav-mobile" class="header-sub header-inner">
+        <table class="menu outer">
+            <tr>
+                
+                    <td><a class="main-nav-link" href="/.">Home</a></td>
+                
+                    <td><a class="main-nav-link" href="/archives">Archives</a></td>
+                
+                    <td><a class="main-nav-link" href="/categories">Categories</a></td>
+                
+                    <td><a class="main-nav-link" href="/tags">Tags</a></td>
+                
+                    <td><a class="main-nav-link" href="/proj">Projects</a></td>
+                
+                    <td><a class="main-nav-link" href="/book">Books</a></td>
+                
+                    <td><a class="main-nav-link" href="/about">About</a></td>
+                
+                <td>
+                    
+    <div class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+    </div>
+
+                </td>
+            </tr>
+        </table>
+    </div>
+</header>
+
+        <div class="outer">
+            
+                
+
+<aside id="profile" class="profile-fixed">
+    <div class="inner profile-inner">
+        <div class="base-info profile-block">
+            <img id="avatar" src="/css/images/image_y.png" />
+            <h2 id="name">Roy Luo</h2>
+            <h3 id="title">Designer &amp; Developer</h3>
+            <span id="location"><i class="fas fa-map-marker-alt" style="padding-right: 5px"></i>Beijing, China</span>
+            <a id="follow" target="_blank" href="https://github.com/royhunter/">FOLLOW</a>
+        </div>
+        <div class="article-info profile-block">
+            <div class="article-info-block">
+                43
+                <span>posts</span>
+            </div>
+            <div class="article-info-block">
+                15
+                <span>tags</span>
+            </div>
+        </div>
+        
+        <div class="profile-block social-links">
+            <table>
+                <tr>
+                    
+                    
+                    <td>
+                        <a href="http://github.com/royhunter/" target="_blank" title="github" class=tooltip>
+                            <i class="fab fa-github"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://twitter.com/RoyLuoye" target="_blank" title="twitter" class=tooltip>
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://www.facebook/roy.luo.3367" target="_blank" title="facebook" class=tooltip>
+                            <i class="fab fa-facebook"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://cn.linkedin.com/in/royluoye" target="_blank" title="linkedin" class=tooltip>
+                            <i class="fab fa-linkedin"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="/atom.xml" target="_blank" title="rss" class=tooltip>
+                            <i class="fab fa-rss"></i>
+                        </a>
+                    </td>
+                    
+                </tr>
+            </table>
+        </div>
+        
+    </div>
+</aside>
+
+            
+            <section id="main"><article id="post-netdev-virtual-1" class="article article-type-post" itemscope itemprop="blogPost">
+    <div class="article-inner">
+        
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+            Qemu之Network Device全虚拟方案一:前端网络流的建立
+        </h1>
+    
+
+                
+                    <div class="article-meta">
+                        
+    <div class="article-date">
+        <i class="fas fa-calendar-alt"></i>
+        <a href="/2014/07/17/netdev-virtual-1/">
+            <time datetime="2014-07-16T16:19:03.000Z" itemprop="datePublished">2014-07-17</time>
+        </a>
+    </div>
+
+
+                        
+    <div class="article-category">
+    	<i class="fas fa-folder"></i>
+        <a class="article-category-link" href="/categories/KVM/">KVM</a>
+    </div>
+
+                        
+    <div class="article-tag">
+        <i class="fas fa-tag"></i>
+        <a class="tag-link" href="/tags/Virtualization-KVM-QEMU/">Virtualization KVM QEMU</a>
+    </div>
+
+                    </div>
+                
+            </header>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+        
+            
+            <p>KVM在I/O虚拟化方面，传统的方式是使用Qemu纯软件的方式来模拟I/O设备，其中包括经常使用的网卡设备。这次我们重点分析Qemu为实现网络设备虚拟化的全虚拟化方案。本主题从三个组成方面来完整描述，包括：1. 前端网络流的建立； 2. 虚拟网卡的创建； 3. 网络I/O虚拟化 in Guest OS。<br>本篇主要讲述“前端网络流的建立”。</p>
+<a id="more"></a>
+<h2 id="VM网络配置方式"><a href="#VM网络配置方式" class="headerlink" title="VM网络配置方式"></a>VM网络配置方式</h2><p>根据KVM的网络配置方案，大概分为如下几种：</p>
+<ol>
+<li>默认用户模式；</li>
+<li>基于网桥(Bridge)的模式；</li>
+<li>基于NAT(Network Address Translation)的模式；</li>
+<li>网络设备的直接分配(基于Intel VT-d技术);</li>
+</ol>
+<p>在“kvm安装与启动过程说明”一文中，Guest OS启动命令中没有传入的网络配置,此时QEMU默认分配rtl8139类型的虚拟网卡类型，使用的是默认用户配置模式，这时候由于没有具体的网络模式的配置，Guest的网络功能是有限的。</p>
+<p>网桥模式是目前比较简单，也是用的比较多的模式，所以我们这里主要分析基于网桥模式下的VM的收发包流程。</p>
+<h2 id="网桥的原理与创建"><a href="#网桥的原理与创建" class="headerlink" title="网桥的原理与创建"></a>网桥的原理与创建</h2><h3 id="网桥的原理"><a href="#网桥的原理" class="headerlink" title="网桥的原理"></a>网桥的原理</h3><p>网桥(Bridge)也称桥接器，是连接两个局域网的存储转发设备，用它可以完成具有相同或相似体系结构网络系统的连接。一般情况下，被连接的网络系统都具有相同的逻辑链路控制规程(LLC)，但媒体访问控制协议(MAC)可以不同。网桥工作在数据链路层，将两个LAN连起来，根据MAC地址来转发帧，其实就是一个简单的二层交换机。</p>
+<p>Linux网络协议栈已经支持了网桥的功能，但需要进行相关的配置才可以进行正常的转发。而要配置Linux网桥功能，需要配置工具bridge-utils，大家可以从网上下载源码编译、安装，生成网桥配置的工具名称为brctl。</p>
+<p>关于Linux网桥，这里不再过多的叙述，有兴趣的同学可以自行研究下，其实就是一些MAC地址学习、转发表的维护、及生成树的协议管理等功能，大家就认为它是个实现在内核中的二层交换机就行。</p>
+<p>Linux网桥的具体实现可以参看我以前总结的关于网桥的流程分析：<a href="http://blog.csdn.net/hsly_support/article/details/8762896" target="_blank" rel="noopener">http://blog.csdn.net/hsly_support/article/details/8762896 </a></p>
+<h3 id="网桥的创建"><a href="#网桥的创建" class="headerlink" title="网桥的创建"></a>网桥的创建</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$brctl</span> addbr br0         <span class="comment">#添加br0这个bridge</span></span><br><span class="line"><span class="variable">$brctl</span> addif br0 eth0    <span class="comment">#将br0与eth0绑定起来</span></span><br></pre></td></tr></table></figure>
+<p>通过上述两条命令，bridge br0成为连接本机与外部网络的接口。</p>
+<p><img src="http://7ktrxu.com1.z0.glb.clouddn.com/1.png" alt=""></p>
+<h2 id="Tap的原理与创建"><a href="#Tap的原理与创建" class="headerlink" title="Tap的原理与创建"></a>Tap的原理与创建</h2><p>qemu-system-x86_64命令关于bridge模式的网络参数如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">-net tap[,vlan=n][,name=str][,fd=h][,ifname=name][,script=file][,downscript=dfile][,helper=helper][,sndbuf=nbytes][,vnet_hdr=on|off][,vhost=on|off][,vhostfd=h][,vhostforce=on|off]</span><br></pre></td></tr></table></figure>
+<p>主要参数说明：</p>
+<pre><code>tap：表示创建一个tap设备；
+ifname：表示tap设备接口名字；
+script：表示host在启动guest时自动配置的脚本，默认为/etc/qemu-ifup；
+downscript：表示host在关闭guest时自动执行的脚本；
+fd=h: 连接到现在已经打开着的TAP接口的文件描述符，一般让QEMU会自动创建一个TAP接口;
+helper=helper:   设置启动客户机时在宿主机中运行的辅助程序，包括去建立一个TAP虚拟设备，它的默认值为/usr/local/libexec/qemu-bridge-helper，一般不用自定义，采用默认值即可;
+sndbuf=nbytes: 限制TAP设备的发送缓冲区大小为n字节，当需要流量进行流量控制时可以设置该选项。其默认值为“sndbuf=0”，即不限制发送缓冲区的大小。
+</code></pre><h3 id="什么是Tap设备"><a href="#什么是Tap设备" class="headerlink" title="什么是Tap设备"></a>什么是Tap设备</h3><p>qemu在这里使用了Tap设备，那Tap设备是什么呢？</p>
+<p>TUN/TAP虚拟网络设备的原理比较简单，在Linux内核中添加了一个TUN/TAP虚拟网络设备的驱动程序和一个与之相关连的字符设备/dev/net/tun，字符设备tun作为用户空间和内核空间交换数据的接口。当内核将数据包发送到虚拟网络设备时，数据包被保存在设备相关的一个队列中，直到用户空间程序通过打开的字符设备tun的描述符读取时，它才会被拷贝到用户空间的缓冲区中，其效果就相当于，数据包直接发送到了用户空间。通过系统调用write发送数据包时其原理与此类似。</p>
+<p>TUN/TAP驱动程序中包含两个部分，一部分是字符设备驱动，还有一部分是网卡驱动部分。利用网卡驱动部分接收来自TCP/IP协议栈的网络分包并发送或者反过来将接收到的网络分包传给协议栈处理，而字符驱动部分则将网络分包在内核与用户态之间传送，模拟物理链路的数据接收和发送。Tun/tap驱动很好的实现了两种驱动的结合。</p>
+<p>总而言之，Tap设备实现了这么一种能力，对于用户空间来讲实现了网络数据包在内核态与用户态之间的传输，对于内核管理来说，它是一个网络设备或者直接呈现的是一个网络接口，可以像普通网络接口一样进行收发包。</p>
+<h3 id="Tap设备的创建"><a href="#Tap设备的创建" class="headerlink" title="Tap设备的创建"></a>Tap设备的创建</h3><p>当命令行中通过-net tap指明创建Tap设备后，在Qemu的main函数中首先解析到了tap的参数选项，然后进入了设备创建流程：</p>
+<pre><code>main()  file: vl.c, line: 2345
+    net_init_clients()  file: net.c, line: 991
+        net_init_client()  file: net.c, line: 962
+            net_client_init()  file: net.c, line: 701
+                net_client_init1()  file: net.c, line: 628
+                    net_client_init_fun[opts-&gt;kind](opts, name, peer)
+</code></pre><p>在Qemu中，所有的-net类型都由net client这个概念来表示：net_client_init_fun由各类net client对应的初始化函数组成：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">static</span> <span class="title">int</span> <span class="params">(* <span class="keyword">const</span> net_client_init_fun[NET_CLIENT_OPTIONS_KIND_MAX])</span><span class="params">(</span></span></span><br><span class="line"><span class="function"><span class="params">    <span class="keyword">const</span> NetClientOptions *opts,</span></span></span><br><span class="line"><span class="function"><span class="params">    <span class="keyword">const</span> <span class="keyword">char</span> *name,</span></span></span><br><span class="line"><span class="function"><span class="params">    NetClientState *peer)</span> </span>= &#123;</span><br><span class="line">    	[NET_CLIENT_OPTIONS_KIND_NIC]       = net_init_nic,     &lt;------网卡设备类型</span><br><span class="line">    	[NET_CLIENT_OPTIONS_KIND_TAP]       = net_init_tap,     &lt;------Tap设备类型</span><br><span class="line">    	[NET_CLIENT_OPTIONS_KIND_SOCKET]    = net_init_socket,</span><br><span class="line">    	[NET_CLIENT_OPTIONS_KIND_HUBPORT]   = net_init_hubport,</span><br><span class="line">    &#125;;</span><br></pre></td></tr></table></figure>
+<p>net_tap_init()主要做了两件事：</p>
+<ol>
+<li>通过tap_open(){open(“/dev/net/tun”)}返回了Tap设备的文件描述符fd;</li>
+<li>将Tap设备的文件描述符加入Qemu事件监听列表;</li>
+<li>通过Qemu-ifup脚本将创建的Tap设备接口加入网桥中,这里假设Tap设备名为tap1；</li>
+</ol>
+<p>主要的调用流程如下：</p>
+<pre><code>net_init_tap()  file: tap.c, line: 589
+    net_tap_init()   file: tap.c, line: 552
+        tap_open()   file: tap-linux.c, line: 38
+            fd = open(PATH_NET_TUN, O_RDWR)   file: tap-linux.c, line: 43
+    net_tap_fd_init()   file: tap.c, line: 325
+        tap_read_poll()  file: tap.c, line: 81
+            tap_update_fd_handler()  file: tap.c, line: 72
+                qemu_set_fd_handler2()  file: iohandler.c, line: 51
+                    QLIST_INSERT_HEAD(&amp;io_handlers, ioh, next);   file: iohandler.c, line: 72
+</code></pre><p>可以看到最后Tap设备的事件通知加入了io_handlers的事件监听列表中，fd_read事件对应的动作为tap_send(),fd_write事件对应的动作为tap_writable()。</p>
+<p>Tap设备接口加入网桥命令：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$brctl</span> addif br0 tap1</span><br></pre></td></tr></table></figure>
+<p><img src="http://7ktrxu.com1.z0.glb.clouddn.com/2.png" alt=""></p>
+<h3 id="Qemu主线程中的事件监听"><a href="#Qemu主线程中的事件监听" class="headerlink" title="Qemu主线程中的事件监听"></a>Qemu主线程中的事件监听</h3><p>io_handlers的事件监听在哪里发生呢？</p>
+<p>Qemu的Main函数通过一系列的初始化，并创建线程进行VM的启动，最后来到了main_loop()(file: vl.c, line: 3790)</p>
+<pre><code>main_loop()  file: vl.c, line: 1631
+    main_loop_wait()  file: main-loop.c, line: 473
+        qemu_iohandler_fill()  file: io_handler.c, line: 93
+        os_host_main_loop_wait()  file: main-loop.c, line: 291
+            select(nfds + 1, &amp;rfds, &amp;wfds, &amp;xfds, tvarg)   &lt;----此处对注册的源进行监听，包括Tap fd;
+        qemu_iohandler_poll()  file: io_handler.c, line: 115 &lt;---调用事件对应动作进行处理；
+</code></pre><h2 id="前端网络数据流程"><a href="#前端网络数据流程" class="headerlink" title="前端网络数据流程"></a>前端网络数据流程</h2><p><img src="http://7ktrxu.com1.z0.glb.clouddn.com/3.png" alt=""></p>
+<p>如图中所示，红色箭头表示数据报文的入方向，步骤：</p>
+<ol>
+<li>网络数据从Host上的物理网卡接收，到达网桥； </li>
+<li>由于eth0与tap1均加入网桥中，根据二层转发原则，br0将数据从tap1口转发出去，即数据由Tap设备接收；</li>
+<li>Tap设备通知对应的fd数据可读；</li>
+<li>fd的读动作通过tap设备的字符设备驱动将数据拷贝到用户空间，完成数据报文的前端接收。</li>
+</ol>
+<p>绿色箭头表示数据报文的出方向，步骤与入方向相反,这里不再详细叙述。</p>
+<p>至此数据完成前端处理，后续如何送进Guest中去呢？下篇继续。</p>
+
+        
+        </div>
+        <footer class="article-footer">
+            <div class="share-container">
+
+
+
+</div>
+
+    <a data-url="http://royhunter.github.io/2014/07/17/netdev-virtual-1/" data-id="ck2oe6fo6001sxkkvsyd9g7qw" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+<script>
+    (function ($) {
+        // Prevent duplicate binding
+        if (typeof(__SHARE_BUTTON_BINDED__) === 'undefined' || !__SHARE_BUTTON_BINDED__) {
+            __SHARE_BUTTON_BINDED__ = true;
+        } else {
+            return;
+        }
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url'),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="fab fa-twitter article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="fab fa-facebook article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="fab fa-pinterest article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                            '<a href="https://plus.google.com/share?url=' + encodedUrl + '" class="fab fa-google article-share-google" target="_blank" title="Google+"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+            
+    
+
+        </footer>
+    </div>
+    
+        
+<nav id="article-nav">
+    
+        <a href="/2014/07/20/netdev-virtual-2/" id="article-nav-newer" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Newer</strong>
+            <div class="article-nav-title">
+                
+                    Qemu之Network Device全虚拟方案二:虚拟网卡
+                
+            </div>
+        </a>
+    
+    
+        <a href="/2014/07/12/KVM_RUN_PROCESS2/" id="article-nav-older" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Older</strong>
+            <div class="article-nav-title">KVM Run Process之KVM核心流程</div>
+        </a>
+    
+</nav>
+
+
+    
+</article>
+
+
+    
+    
+
+</section>
+            
+                
+<aside id="sidebar">
+   
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">recent</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2020/07/12/index/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"></p>
+                            <p class="item-title"><a href="/2020/07/12/index/" class="title">Blog索引</a></p>
+                            <p class="item-date"><time datetime="2020-07-12T13:33:28.000Z" itemprop="datePublished">2020-07-12</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/07/17/ovs02-vxlan/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/07/17/ovs02-vxlan/" class="title">OVS02-VXLAN内核相关实现</a></p>
+                            <p class="item-date"><time datetime="2018-07-17T12:15:34.000Z" itemprop="datePublished">2018-07-17</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/01/10/perf-tunning/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/01/10/perf-tunning/" class="title">datapath性能优化总结</a></p>
+                            <p class="item-date"><time datetime="2018-01-10T13:26:32.000Z" itemprop="datePublished">2018-01-10</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2017/04/18/ovs01/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2017/04/18/ovs01/" class="title">OVS01-OVS基础-安装、配置、Simple Case</a></p>
+                            <p class="item-date"><time datetime="2017-04-18T13:26:32.000Z" itemprop="datePublished">2017-04-18</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2016/08/28/trampolines-for-nested-functions/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Programme/">Programme</a></p>
+                            <p class="item-title"><a href="/2016/08/28/trampolines-for-nested-functions/" class="title">Trampolines for Nested Functions in GCC</a></p>
+                            <p class="item-date"><time datetime="2016-08-28T13:26:32.000Z" itemprop="datePublished">2016-08-28</time></p>
+                        </div>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">categories</h3>
+        <div class="widget">
+            <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Algorithm/">Algorithm</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Container/">Container</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Docker/">Docker</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Hyper-V/">Hyper-V</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/KVM/">KVM</a><span class="category-list-count">22</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Misc/">Misc</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/PROGRAMME/">PROGRAMME</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Programme/">Programme</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Virtualization/">Virtualization</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/go/">go</a><span class="category-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">archives</h3>
+        <div class="widget">
+            <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">July 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">July 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">January 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">April 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">August 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/06/">June 2016</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/05/">May 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/03/">March 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/02/">February 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/01/">January 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/12/">December 2015</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/11/">November 2015</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/08/">August 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/07/">July 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/06/">June 2014</a><span class="archive-list-count">5</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tags</h3>
+        <div class="widget">
+            <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Container/">Container</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Distribute/">Distribute</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/EPT/">EPT</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux-namespace/">Linux namespace</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Network/">Network</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/PROGRAMME/">PROGRAMME</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Programme-Language/">Programme Language</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/QEMU/">QEMU</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Tools/">Tools</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization/">Virtualization</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization-KVM-QEMU/">Virtualization KVM QEMU</a><span class="tag-list-count">9</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/libvirt/">libvirt</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vhost/">vhost</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/virtio/">virtio</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vps-proxy/">vps_proxy</a><span class="tag-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tag cloud</h3>
+        <div class="widget tagcloud">
+            <a href="/tags/Container/" style="font-size: 12.5px;">Container</a> <a href="/tags/Distribute/" style="font-size: 12.5px;">Distribute</a> <a href="/tags/EPT/" style="font-size: 12.5px;">EPT</a> <a href="/tags/Linux-namespace/" style="font-size: 12.5px;">Linux namespace</a> <a href="/tags/Network/" style="font-size: 15px;">Network</a> <a href="/tags/PROGRAMME/" style="font-size: 10px;">PROGRAMME</a> <a href="/tags/Programme-Language/" style="font-size: 10px;">Programme Language</a> <a href="/tags/QEMU/" style="font-size: 12.5px;">QEMU</a> <a href="/tags/Tools/" style="font-size: 12.5px;">Tools</a> <a href="/tags/Virtualization/" style="font-size: 17.5px;">Virtualization</a> <a href="/tags/Virtualization-KVM-QEMU/" style="font-size: 20px;">Virtualization KVM QEMU</a> <a href="/tags/libvirt/" style="font-size: 10px;">libvirt</a> <a href="/tags/vhost/" style="font-size: 10px;">vhost</a> <a href="/tags/virtio/" style="font-size: 17.5px;">virtio</a> <a href="/tags/vps-proxy/" style="font-size: 10px;">vps_proxy</a>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">links</h3>
+        <div class="widget">
+            <ul>
+                
+                    <li>
+                        <a href="http://hexo.io">Hexo</a>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+
+    
+    <div id="toTop" class="fas fa-angle-up"></div>
+</aside>
+
+            
+        </div>
+        <footer id="footer">
+    <div class="outer">
+        <div id="footer-info" class="inner">
+            &copy; 2019 John Doe<br>
+            Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>. Theme by <a href="http://github.com/ppoffice">PPOffice</a>
+        </div>
+    </div>
+</footer>
+        
+
+
+    
+        <script src="/libs/lightgallery/js/lightgallery.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-thumbnail.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-pager.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-autoplay.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-fullscreen.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-zoom.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-hash.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-share.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-video.min.js"></script>
+    
+    
+        <script src="/libs/justified-gallery/jquery.justifiedGallery.min.js"></script>
+    
+    
+
+
+
+<!-- Custom Scripts -->
+<script src="/js/main.js"></script>
+
+    </div>
+</body>
+</html>

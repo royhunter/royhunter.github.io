@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <meta charset="utf-8">
+    
+    <title>Virtio-Blk浅析 | RoyLuo&#39;s Notes</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="description" content="和virtio-network一样，virtio-blk驱动使用Virtio机制为Guest提供了一个高性能的块设备I/O的方法。我们这里看下virtio-blk的实现。 Linux中的块设备在介绍virtio-blk之前，先科普下Linux内核中的块设备整体架构。">
+<meta name="keywords" content="virtio">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Virtio-Blk浅析">
+<meta property="og:url" content="http://royhunter.github.io/2014/08/29/virtio-blk/index.html">
+<meta property="og:site_name" content="RoyLuo&#39;s Notes">
+<meta property="og:description" content="和virtio-network一样，virtio-blk驱动使用Virtio机制为Guest提供了一个高性能的块设备I/O的方法。我们这里看下virtio-blk的实现。 Linux中的块设备在介绍virtio-blk之前，先科普下Linux内核中的块设备整体架构。">
+<meta property="og:locale" content="en">
+<meta property="og:image" content="http://7narr6.com1.z0.glb.clouddn.com/1.PNG">
+<meta property="og:image" content="http://7narr6.com1.z0.glb.clouddn.com/2.PNG">
+<meta property="og:image" content="http://7narr6.com1.z0.glb.clouddn.com/3.PNG">
+<meta property="og:updated_time" content="2016-06-25T03:04:36.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Virtio-Blk浅析">
+<meta name="twitter:description" content="和virtio-network一样，virtio-blk驱动使用Virtio机制为Guest提供了一个高性能的块设备I/O的方法。我们这里看下virtio-blk的实现。 Linux中的块设备在介绍virtio-blk之前，先科普下Linux内核中的块设备整体架构。">
+<meta name="twitter:image" content="http://7narr6.com1.z0.glb.clouddn.com/1.PNG">
+    
+
+    
+        <link rel="alternate" href="atom.xml" title="RoyLuo&#39;s Notes" type="application/atom+xml" />
+    
+
+    
+
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fontawesome.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-brands.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-solid.min.css">
+    <link rel="stylesheet" href="/libs/open-sans/styles.css">
+    <link rel="stylesheet" href="/libs/source-code-pro/styles.css">
+
+    <link rel="stylesheet" href="/css/style.css">
+
+    <script src="/libs/jquery/2.1.3/jquery.min.js"></script>
+    
+    
+        <link rel="stylesheet" href="/libs/lightgallery/css/lightgallery.min.css">
+    
+    
+        <link rel="stylesheet" href="/libs/justified-gallery/justifiedGallery.min.css">
+    
+    
+    
+    
+
+
+</head>
+
+<body>
+    <div id="container">
+        <header id="header">
+    <div id="header-main" class="header-inner">
+        <div class="outer">
+            <a href="/" id="logo">
+                <i class="logo"></i>
+                <span class="site-title">RoyLuo&#39;s Notes</span>
+            </a>
+            <nav id="main-nav">
+                
+                    <a class="main-nav-link" href="/.">Home</a>
+                
+                    <a class="main-nav-link" href="/archives">Archives</a>
+                
+                    <a class="main-nav-link" href="/categories">Categories</a>
+                
+                    <a class="main-nav-link" href="/tags">Tags</a>
+                
+                    <a class="main-nav-link" href="/proj">Projects</a>
+                
+                    <a class="main-nav-link" href="/book">Books</a>
+                
+                    <a class="main-nav-link" href="/about">About</a>
+                
+            </nav>
+            
+                
+                <nav id="sub-nav">
+                    <div class="profile" id="profile-nav">
+                        <a id="profile-anchor" href="javascript:;">
+                            <img class="avatar" src="/css/images/image_y.png" />
+                            <i class="fas fa-caret-down"></i>
+                        </a>
+                    </div>
+                </nav>
+            
+            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+        <button type="submit" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" placeholder="Type something..." />
+            <span class="ins-close ins-selectable"><i class="fas fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script>
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: 'Posts',
+            PAGES: 'Pages',
+            CATEGORIES: 'Categories',
+            TAGS: 'Tags',
+            UNTITLED: '(Untitled)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+<script src="/js/insight.js"></script>
+
+</div>
+        </div>
+    </div>
+    <div id="main-nav-mobile" class="header-sub header-inner">
+        <table class="menu outer">
+            <tr>
+                
+                    <td><a class="main-nav-link" href="/.">Home</a></td>
+                
+                    <td><a class="main-nav-link" href="/archives">Archives</a></td>
+                
+                    <td><a class="main-nav-link" href="/categories">Categories</a></td>
+                
+                    <td><a class="main-nav-link" href="/tags">Tags</a></td>
+                
+                    <td><a class="main-nav-link" href="/proj">Projects</a></td>
+                
+                    <td><a class="main-nav-link" href="/book">Books</a></td>
+                
+                    <td><a class="main-nav-link" href="/about">About</a></td>
+                
+                <td>
+                    
+    <div class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+    </div>
+
+                </td>
+            </tr>
+        </table>
+    </div>
+</header>
+
+        <div class="outer">
+            
+                
+
+<aside id="profile" class="profile-fixed">
+    <div class="inner profile-inner">
+        <div class="base-info profile-block">
+            <img id="avatar" src="/css/images/image_y.png" />
+            <h2 id="name">Roy Luo</h2>
+            <h3 id="title">Designer &amp; Developer</h3>
+            <span id="location"><i class="fas fa-map-marker-alt" style="padding-right: 5px"></i>Beijing, China</span>
+            <a id="follow" target="_blank" href="https://github.com/royhunter/">FOLLOW</a>
+        </div>
+        <div class="article-info profile-block">
+            <div class="article-info-block">
+                43
+                <span>posts</span>
+            </div>
+            <div class="article-info-block">
+                15
+                <span>tags</span>
+            </div>
+        </div>
+        
+        <div class="profile-block social-links">
+            <table>
+                <tr>
+                    
+                    
+                    <td>
+                        <a href="http://github.com/royhunter/" target="_blank" title="github" class=tooltip>
+                            <i class="fab fa-github"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://twitter.com/RoyLuoye" target="_blank" title="twitter" class=tooltip>
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://www.facebook/roy.luo.3367" target="_blank" title="facebook" class=tooltip>
+                            <i class="fab fa-facebook"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://cn.linkedin.com/in/royluoye" target="_blank" title="linkedin" class=tooltip>
+                            <i class="fab fa-linkedin"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="/atom.xml" target="_blank" title="rss" class=tooltip>
+                            <i class="fab fa-rss"></i>
+                        </a>
+                    </td>
+                    
+                </tr>
+            </table>
+        </div>
+        
+    </div>
+</aside>
+
+            
+            <section id="main"><article id="post-virtio-blk" class="article article-type-post" itemscope itemprop="blogPost">
+    <div class="article-inner">
+        
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+            Virtio-Blk浅析
+        </h1>
+    
+
+                
+                    <div class="article-meta">
+                        
+    <div class="article-date">
+        <i class="fas fa-calendar-alt"></i>
+        <a href="/2014/08/29/virtio-blk/">
+            <time datetime="2014-08-29T13:08:21.000Z" itemprop="datePublished">2014-08-29</time>
+        </a>
+    </div>
+
+
+                        
+    <div class="article-category">
+    	<i class="fas fa-folder"></i>
+        <a class="article-category-link" href="/categories/KVM/">KVM</a>
+    </div>
+
+                        
+    <div class="article-tag">
+        <i class="fas fa-tag"></i>
+        <a class="tag-link" href="/tags/virtio/">virtio</a>
+    </div>
+
+                    </div>
+                
+            </header>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+        
+            
+            <p>和virtio-network一样，virtio-blk驱动使用Virtio机制为Guest提供了一个高性能的块设备I/O的方法。我们这里看下virtio-blk的实现。</p>
+<h2 id="Linux中的块设备"><a href="#Linux中的块设备" class="headerlink" title="Linux中的块设备"></a>Linux中的块设备</h2><p>在介绍virtio-blk之前，先科普下Linux内核中的块设备整体架构。</p>
+<a id="more"></a>
+<h3 id="基本概念"><a href="#基本概念" class="headerlink" title="基本概念"></a>基本概念</h3><p>Linux操作系统有三类主要的设备文件：</p>
+<ol>
+<li>字符设备：以字节为单位进行顺序I/O操作的设备；</li>
+<li>块设备：以块单位接收输入返回，对于I/O请求有对应的缓冲区，可以随机访问，块设备的访问位置必须能够在介质的不同区间前后移动。在块设备中，最小的可寻址单元是扇区，扇区的大小一般是2的整数倍，常见的大小为512个字节；</li>
+<li>网络设备：提供网络数据通信服务。</li>
+</ol>
+<p>这里主题讨论块设备。</p>
+<ol>
+<li>扇区(Sectors)：任何块设备硬件对数据处理的基本单位。通常，1个扇区的大小为512byte。</li>
+<li>块(Blocks)：由Linux制定对内核或文件系统等数据处理的基本单位。通常，1个块由1个或多个扇区组成。</li>
+</ol>
+<h3 id="整体架构"><a href="#整体架构" class="headerlink" title="整体架构"></a>整体架构</h3><p><img src="http://7narr6.com1.z0.glb.clouddn.com/1.PNG" alt=""></p>
+<p>相关说明：</p>
+<ol>
+<li>通用块层(Generic Block Layer)负责维持一个I/O请求在上层文件系统与底层物理磁盘之间的关系。在通用块层中，<strong>通常用一个bio结构体来对应一个I/O请求</strong>。</li>
+<li>驱动对块设备的输入或输出(I/O)操作，都会向块设备发出一个请求，在驱动中用<strong>request</strong>结构体描述。但对于一些磁盘设备而言请求的速度很慢，这时候内核就提供一种队列的机制把这些I/O请求添加到队列中（即：请求队列），在驱动中用<strong>request_queue</strong>结构体描述。</li>
+<li>I/O调度层(I/O Scheduler Layer)的作用:在向块设备提交这些请求前内核会先执行请求的合并和排序预操作，以提高访问的效率，然后再由内核中的I/O调度程序子系统来负责提交  I/O 请求，  调度程序将磁盘资源分配给系统中所有挂起的块I/O请求，其工作是管理块设备的请求队列，决定队列中的请求的排列顺序以及什么时候派发请求到设备。</li>
+<li>对于每一个独立的磁盘设备或者分区，Linux提供一个<strong>gendisk</strong>数据结构体，用于对底层物理磁盘进行访问。在gendisk中有一个硬件操作结构指针，为<strong>block_device_operations</strong>结构体。</li>
+</ol>
+<p>当多个请求提交给块设备时，执行效率依赖于请求的顺序。如果所有的请求是同一个方向（如：写数据），执行效率是最大的。内核在调用块设备驱动程序例程处理请求之前，先收集I/O请求并将请求排序，然后将连续扇区操作的多个请求进行合并以提高执行效率，对I/O请求排序的算法称为电梯算法（elevator algorithm）。电梯算法在I/O调度层完成。内核提供了不同类型的电梯算法，电梯算法有：</p>
+<ol>
+<li>noop（实现简单的FIFO，基本的直接合并与排序）；</li>
+<li>anticipatory（延迟I/O请求，进行临界区的优化排序）；</li>
+<li>Deadline（针对anticipatory缺点进行改善，降低延迟时间）；</li>
+<li>Cfq（均匀分配I/O带宽，公平机制）。</li>
+</ol>
+<h3 id="数据结构"><a href="#数据结构" class="headerlink" title="数据结构"></a>数据结构</h3><ol>
+<li><p>块设备对象结构block_device<br>内核用结构block_device实例代表一个块设备对象，如：整个硬盘或特定分区。如果该结构代表一个分区，则其成员bd_part指向设备的分区结构。如果该结构代表设备，则其成员bd_disk指向设备的通用硬盘结构gendisk<br>当用户打开块设备文件时，内核创建结构block_device实例，设备驱动程序还将创建结构gendisk实例，分配请求队列并注册结构block_device结构。</p>
+</li>
+<li><p>通用硬盘结构 gendisk<br>结构体gendisk代表了一个通用硬盘（generic hard disk）对象，它存储了一个硬盘的信息，包括请求队列、分区链表和块设备操作函数集等。块设备驱动程序分配结构gendisk实例，装载分区表，分配请求队列并填充结构的其他域。<br>支持分区的块驱动程序必须包含 头文件，并声明一个结构gendisk，内核还维护该结构实例的一个全局链表gendisk_head，通过函数add_gendisk、del_gendisk和get_gendisk维护该链表。</p>
+</li>
+<li><p>请求结构request<br>结构request代表了挂起的I/O请求，每个请求用一个结构request实例描述，存放在请求队列链表中，由电梯算法进行排序，每个请求包含1个或多个结构bio实例。</p>
+</li>
+<li><p>请求队列结构request_queue<br>每个块设备都有一个请求队列，每个请求队列单独执行I/O调度，请求队列是由请求结构实例链接成的双向链表，链表以及整个队列的信息用结构request_queue描述，称为请求队列对象结构或请求队列结构。它存放了关于挂起请求的信息以及管理请求队列（如：电梯算法）所需要的信息。结构成员request_fn是来自设备驱动程序的请求处理函数。</p>
+</li>
+<li><p>Bio结构<br>通常1个bio对应1个I/O请求，IO调度算法可将连续的bio合并成1个请求。所以，1个请求可以包含多个bio。<br><strong>bio为通用层的主要数据结构，既描述了磁盘的位置，又描述了内存的位置，是上层内核vfs与下层驱动的连接纽带</strong>。</p>
+</li>
+</ol>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>块设备的I/O操作方式与字符设备存在较大的不同，因而引入了<br>request_queue、request、bio等一系列数据结构。在整个块设备的I/O操作中，贯穿于始终的就是“请求”，字符设备的I/O操作则是直接进行访问，<br>为提高性能，块设备的I/O操作会进行排队和整合。<br>驱动的任务是处理请求，对请求的排队和整合由I/O调度算法解决，因此，块设备驱动的核心就是请求处理函数或“制造请求”函数。</p>
+<h2 id="virtio-blk"><a href="#virtio-blk" class="headerlink" title="virtio-blk"></a>virtio-blk</h2><h3 id="初始化"><a href="#初始化" class="headerlink" title="初始化"></a>初始化</h3><p>相关代码位于：drivers/block/virtio_blk.c</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> <span class="keyword">int</span> __<span class="function">init <span class="title">init</span><span class="params">(<span class="keyword">void</span>)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="keyword">int</span> error;</span><br><span class="line"></span><br><span class="line">	virtblk_wq = alloc_workqueue(<span class="string">"virtio-blk"</span>, <span class="number">0</span>, <span class="number">0</span>);</span><br><span class="line">	<span class="keyword">if</span> (!virtblk_wq)</span><br><span class="line">		<span class="keyword">return</span> -ENOMEM;</span><br><span class="line"></span><br><span class="line">	major = register_blkdev(<span class="number">0</span>, <span class="string">"virtblk"</span>);</span><br><span class="line">	<span class="keyword">if</span> (major &lt; <span class="number">0</span>) &#123;</span><br><span class="line">		error = major;</span><br><span class="line">		<span class="keyword">goto</span> out_destroy_workqueue;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	error = register_virtio_driver(&amp;virtio_blk);</span><br><span class="line">	<span class="keyword">if</span> (error)</span><br><span class="line">		<span class="keyword">goto</span> out_unregister_blkdev;</span><br><span class="line">	<span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">out_unregister_blkdev:</span><br><span class="line">	unregister_blkdev(major, <span class="string">"virtblk"</span>);</span><br><span class="line">out_destroy_workqueue:</span><br><span class="line">	destroy_workqueue(virtblk_wq);</span><br><span class="line">		<span class="keyword">return</span> error;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>通过register_blkdev()向块设备层注册一个块设备，并同时通过register_virtio_driver向virtio层注册了virtio_blk driver。前面virtio分析中说到virtio设备层是一个PCI设备接口层。所以这里的virtio blk都是建立在pci接口之上的。</p>
+<p>当Qemu启动Guest时指定了使用virtio blk设备时，virtio_blk结构中注册的probe函数会在启动过程中调用到来初始化virtio blk设备。具体的virtblk_probe()作用为：</p>
+<ul>
+<li>分配struct virtio_blk结构，代表一个virtio blk设备</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">vdev-&gt;priv = vblk = kmalloc(<span class="keyword">sizeof</span>(*vblk), GFP_KERNEL);</span><br></pre></td></tr></table></figure>
+<ul>
+<li>分配virtqueue，这里不同于virtio-net设备，只使用了一个virtqueue</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">init_vq(vblk);</span><br></pre></td></tr></table></figure>
+<ul>
+<li>分配gendisk结构，代表了virtio blk物理磁盘</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">vblk-&gt;disk = alloc_disk(<span class="number">1</span> &lt;&lt; PART_BITS);</span><br></pre></td></tr></table></figure>
+<ul>
+<li>分配request_queue结构，从属于virtio-blk的gendisk结构下</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">q = vblk-&gt;disk-&gt;<span class="built_in">queue</span> = blk_mq_init_queue(&amp;virtio_mq_reg, vblk);</span><br></pre></td></tr></table></figure>
+<p>对request的操作处理函数都在virtio_mq_reg结构的virtio_mq_ops中：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> <span class="class"><span class="keyword">struct</span> <span class="title">blk_mq_ops</span> <span class="title">virtio_mq_ops</span> = &#123;</span></span><br><span class="line">	.queue_rq	= virtio_queue_rq,</span><br><span class="line">	.map_queue	= blk_mq_map_queue,</span><br><span class="line">	.alloc_hctx	= blk_mq_alloc_single_hw_queue,</span><br><span class="line">	.free_hctx	= blk_mq_free_single_hw_queue,</span><br><span class="line">	.complete	= virtblk_request_done,</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>request的存储区vbr初始化，结构依旧是scatter-list形式</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">blk_mq_init_commands(q, virtblk_init_vbr, vblk);</span><br></pre></td></tr></table></figure>
+<p>内核中块I/O操作的基本容器由bio结构体表示，该结构体代表了正在现场的（活动的）以片段（segment）链表形式组织的块I/O操作。一个片段是一小块连续的内存缓冲区。这样的好处就是不需要保证单个缓冲区一定要连续。所以通过片段来描述缓冲区，即使一个缓冲区分散在内存的多个位置上，bio结构体也 能对内核保证I/O操作的执行，这样的就叫做聚散I/O.</p>
+<ul>
+<li>分配virtio blk的磁盘名称</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">virtblk_name_format(<span class="string">"vd"</span>, index, vblk-&gt;disk-&gt;disk_name, DISK_NAME_LEN);</span><br></pre></td></tr></table></figure>
+<p>使用virtio_blk驱动的磁盘显示为“/dev/vda”，这不同于IDE硬盘的“/dev/hda”或者SATA硬盘的“/dev/sda”这样的显示标识。</p>
+<ul>
+<li>完善disk信息，将virtio blk的disk信息注册至块设备层同一管理 </li>
+</ul>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">vblk-&gt;disk-&gt;major = major;</span><br><span class="line">vblk-&gt;disk-&gt;first_minor = index_to_minor(index);</span><br><span class="line">vblk-&gt;disk-&gt;private_data = vblk;</span><br><span class="line">vblk-&gt;disk-&gt;fops = &amp;virtblk_fops;</span><br><span class="line">vblk-&gt;disk-&gt;driverfs_dev = &amp;vdev-&gt;dev;</span><br><span class="line">vblk-&gt;index = index;</span><br><span class="line">add_disk(vblk-&gt;disk);</span><br></pre></td></tr></table></figure>
+<p><img src="http://7narr6.com1.z0.glb.clouddn.com/2.PNG" alt=""></p>
+<h3 id="数据处理"><a href="#数据处理" class="headerlink" title="数据处理"></a>数据处理</h3><h4 id="后端—–-gt-前端"><a href="#后端—–-gt-前端" class="headerlink" title="后端—–&gt;前端"></a>后端—–&gt;前端</h4><p>virtio_blk结构体中的gendisk结构的request_queue队列接收block层的bio请求，按照request_queue队列默认处理过程，bio请求会在io调度层转化为request，然后进入request_queue队列，最后调用virtblk_request将request转化为vbr结构。</p>
+<pre><code>virtio_queue_rq()                &lt;---- 注册于request_queue结构的queue_rq成员
+    ---&gt;blk_rq_map_sg()          &lt;---- 将vbr填入scatter-list中
+    ---&gt;__virtblk_add_req()       
+        ---&gt;virtqueue_add_sgs()  &lt;---- scatter-list成员入virtqueue的vring
+    ---&gt;virtqueue_kick           &lt;---- 通知前端
+</code></pre><p>最后由Qemu接管处理。</p>
+<h4 id="前端—–-gt-后端"><a href="#前端—–-gt-后端" class="headerlink" title="前端—–&gt;后端"></a>前端—–&gt;后端</h4><p>Qemu处理过vdr后会将它加入到virtio_ring的request队列，并发一个中断给队列，队列的中断响应函数vring_interrupt调用队列的回调函数virtblk_done；</p>
+<pre><code>virtblk_done()
+    ---&gt;blk_mq_complete_request()
+</code></pre><p>最后由request_queue注册的complete函数virtblk_request_done()处理，通过blk_mq_end_io()通告块设备层IO结束。</p>
+<h3 id="request生命周期的图示"><a href="#request生命周期的图示" class="headerlink" title="request生命周期的图示"></a>request生命周期的图示</h3><p><img src="http://7narr6.com1.z0.glb.clouddn.com/3.PNG" alt=""></p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ol>
+<li>“深入理解Linux内核”</li>
+<li>“2012-forum-virtio-blk-performance-improvement.pdf”</li>
+</ol>
+
+        
+        </div>
+        <footer class="article-footer">
+            <div class="share-container">
+
+
+
+</div>
+
+    <a data-url="http://royhunter.github.io/2014/08/29/virtio-blk/" data-id="ck2oe6fqn0042xkkvobifx7uk" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+<script>
+    (function ($) {
+        // Prevent duplicate binding
+        if (typeof(__SHARE_BUTTON_BINDED__) === 'undefined' || !__SHARE_BUTTON_BINDED__) {
+            __SHARE_BUTTON_BINDED__ = true;
+        } else {
+            return;
+        }
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url'),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="fab fa-twitter article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="fab fa-facebook article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="fab fa-pinterest article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                            '<a href="https://plus.google.com/share?url=' + encodedUrl + '" class="fab fa-google article-share-google" target="_blank" title="Google+"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+            
+    
+
+        </footer>
+    </div>
+    
+        
+<nav id="article-nav">
+    
+        <a href="/2014/08/31/virtio-blk-improvement/" id="article-nav-newer" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Newer</strong>
+            <div class="article-nav-title">
+                
+                    Virtio-Blk性能加速方案
+                
+            </div>
+        </a>
+    
+    
+        <a href="/2014/08/22/vhost/" id="article-nav-older" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Older</strong>
+            <div class="article-nav-title">Vhost Architecture</div>
+        </a>
+    
+</nav>
+
+
+    
+</article>
+
+
+    
+    
+
+</section>
+            
+                
+<aside id="sidebar">
+   
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">recent</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2020/07/12/index/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"></p>
+                            <p class="item-title"><a href="/2020/07/12/index/" class="title">Blog索引</a></p>
+                            <p class="item-date"><time datetime="2020-07-12T13:33:28.000Z" itemprop="datePublished">2020-07-12</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/07/17/ovs02-vxlan/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/07/17/ovs02-vxlan/" class="title">OVS02-VXLAN内核相关实现</a></p>
+                            <p class="item-date"><time datetime="2018-07-17T12:15:34.000Z" itemprop="datePublished">2018-07-17</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/01/10/perf-tunning/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/01/10/perf-tunning/" class="title">datapath性能优化总结</a></p>
+                            <p class="item-date"><time datetime="2018-01-10T13:26:32.000Z" itemprop="datePublished">2018-01-10</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2017/04/18/ovs01/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2017/04/18/ovs01/" class="title">OVS01-OVS基础-安装、配置、Simple Case</a></p>
+                            <p class="item-date"><time datetime="2017-04-18T13:26:32.000Z" itemprop="datePublished">2017-04-18</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2016/08/28/trampolines-for-nested-functions/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Programme/">Programme</a></p>
+                            <p class="item-title"><a href="/2016/08/28/trampolines-for-nested-functions/" class="title">Trampolines for Nested Functions in GCC</a></p>
+                            <p class="item-date"><time datetime="2016-08-28T13:26:32.000Z" itemprop="datePublished">2016-08-28</time></p>
+                        </div>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">categories</h3>
+        <div class="widget">
+            <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Algorithm/">Algorithm</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Container/">Container</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Docker/">Docker</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Hyper-V/">Hyper-V</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/KVM/">KVM</a><span class="category-list-count">22</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Misc/">Misc</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/PROGRAMME/">PROGRAMME</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Programme/">Programme</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Virtualization/">Virtualization</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/go/">go</a><span class="category-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">archives</h3>
+        <div class="widget">
+            <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">July 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">July 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">January 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">April 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">August 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/06/">June 2016</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/05/">May 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/03/">March 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/02/">February 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/01/">January 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/12/">December 2015</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/11/">November 2015</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/08/">August 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/07/">July 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/06/">June 2014</a><span class="archive-list-count">5</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tags</h3>
+        <div class="widget">
+            <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Container/">Container</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Distribute/">Distribute</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/EPT/">EPT</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux-namespace/">Linux namespace</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Network/">Network</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/PROGRAMME/">PROGRAMME</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Programme-Language/">Programme Language</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/QEMU/">QEMU</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Tools/">Tools</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization/">Virtualization</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization-KVM-QEMU/">Virtualization KVM QEMU</a><span class="tag-list-count">9</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/libvirt/">libvirt</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vhost/">vhost</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/virtio/">virtio</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vps-proxy/">vps_proxy</a><span class="tag-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tag cloud</h3>
+        <div class="widget tagcloud">
+            <a href="/tags/Container/" style="font-size: 12.5px;">Container</a> <a href="/tags/Distribute/" style="font-size: 12.5px;">Distribute</a> <a href="/tags/EPT/" style="font-size: 12.5px;">EPT</a> <a href="/tags/Linux-namespace/" style="font-size: 12.5px;">Linux namespace</a> <a href="/tags/Network/" style="font-size: 15px;">Network</a> <a href="/tags/PROGRAMME/" style="font-size: 10px;">PROGRAMME</a> <a href="/tags/Programme-Language/" style="font-size: 10px;">Programme Language</a> <a href="/tags/QEMU/" style="font-size: 12.5px;">QEMU</a> <a href="/tags/Tools/" style="font-size: 12.5px;">Tools</a> <a href="/tags/Virtualization/" style="font-size: 17.5px;">Virtualization</a> <a href="/tags/Virtualization-KVM-QEMU/" style="font-size: 20px;">Virtualization KVM QEMU</a> <a href="/tags/libvirt/" style="font-size: 10px;">libvirt</a> <a href="/tags/vhost/" style="font-size: 10px;">vhost</a> <a href="/tags/virtio/" style="font-size: 17.5px;">virtio</a> <a href="/tags/vps-proxy/" style="font-size: 10px;">vps_proxy</a>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">links</h3>
+        <div class="widget">
+            <ul>
+                
+                    <li>
+                        <a href="http://hexo.io">Hexo</a>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+
+    
+    <div id="toTop" class="fas fa-angle-up"></div>
+</aside>
+
+            
+        </div>
+        <footer id="footer">
+    <div class="outer">
+        <div id="footer-info" class="inner">
+            &copy; 2019 John Doe<br>
+            Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>. Theme by <a href="http://github.com/ppoffice">PPOffice</a>
+        </div>
+    </div>
+</footer>
+        
+
+
+    
+        <script src="/libs/lightgallery/js/lightgallery.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-thumbnail.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-pager.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-autoplay.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-fullscreen.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-zoom.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-hash.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-share.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-video.min.js"></script>
+    
+    
+        <script src="/libs/justified-gallery/jquery.justifiedGallery.min.js"></script>
+    
+    
+
+
+
+<!-- Custom Scripts -->
+<script src="/js/main.js"></script>
+
+    </div>
+</body>
+</html>

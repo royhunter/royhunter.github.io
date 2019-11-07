@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <meta charset="utf-8">
+    
+    <title>KVM之内存虚拟化(KVM MMU Virtualization) | RoyLuo&#39;s Notes</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="description" content="内存虚拟化技术是虚拟化技术中的基石，今天和同事聊到了内存虚拟化的实现问题，发现KVM虚拟化技术系列中少了一篇这方面的实现分析，特此补上。 内存虚拟化方案  纯软件模拟（SOFTMMU)—ShadowPage  硬件辅助实现 —EPT">
+<meta name="keywords" content="Virtualization">
+<meta property="og:type" content="article">
+<meta property="og:title" content="KVM之内存虚拟化(KVM MMU Virtualization)">
+<meta property="og:url" content="http://royhunter.github.io/2016/03/13/kvm-mmu-virtualization/index.html">
+<meta property="og:site_name" content="RoyLuo&#39;s Notes">
+<meta property="og:description" content="内存虚拟化技术是虚拟化技术中的基石，今天和同事聊到了内存虚拟化的实现问题，发现KVM虚拟化技术系列中少了一篇这方面的实现分析，特此补上。 内存虚拟化方案  纯软件模拟（SOFTMMU)—ShadowPage  硬件辅助实现 —EPT">
+<meta property="og:locale" content="en">
+<meta property="og:image" content="http://7jpnjo.com1.z0.glb.clouddn.com/mmu-1.PNG">
+<meta property="og:image" content="http://7jpnjo.com1.z0.glb.clouddn.com/mmu-2.PNG">
+<meta property="og:image" content="http://7jpnjo.com1.z0.glb.clouddn.com/mmu-3.PNG">
+<meta property="og:image" content="http://7jpnjo.com1.z0.glb.clouddn.com/mmu-4.PNG">
+<meta property="og:image" content="http://7jpnjo.com1.z0.glb.clouddn.com/mmu-5.PNG">
+<meta property="og:updated_time" content="2016-06-25T03:59:36.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="KVM之内存虚拟化(KVM MMU Virtualization)">
+<meta name="twitter:description" content="内存虚拟化技术是虚拟化技术中的基石，今天和同事聊到了内存虚拟化的实现问题，发现KVM虚拟化技术系列中少了一篇这方面的实现分析，特此补上。 内存虚拟化方案  纯软件模拟（SOFTMMU)—ShadowPage  硬件辅助实现 —EPT">
+<meta name="twitter:image" content="http://7jpnjo.com1.z0.glb.clouddn.com/mmu-1.PNG">
+    
+
+    
+        <link rel="alternate" href="atom.xml" title="RoyLuo&#39;s Notes" type="application/atom+xml" />
+    
+
+    
+
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fontawesome.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-brands.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-solid.min.css">
+    <link rel="stylesheet" href="/libs/open-sans/styles.css">
+    <link rel="stylesheet" href="/libs/source-code-pro/styles.css">
+
+    <link rel="stylesheet" href="/css/style.css">
+
+    <script src="/libs/jquery/2.1.3/jquery.min.js"></script>
+    
+    
+        <link rel="stylesheet" href="/libs/lightgallery/css/lightgallery.min.css">
+    
+    
+        <link rel="stylesheet" href="/libs/justified-gallery/justifiedGallery.min.css">
+    
+    
+    
+    
+
+
+</head>
+
+<body>
+    <div id="container">
+        <header id="header">
+    <div id="header-main" class="header-inner">
+        <div class="outer">
+            <a href="/" id="logo">
+                <i class="logo"></i>
+                <span class="site-title">RoyLuo&#39;s Notes</span>
+            </a>
+            <nav id="main-nav">
+                
+                    <a class="main-nav-link" href="/.">Home</a>
+                
+                    <a class="main-nav-link" href="/archives">Archives</a>
+                
+                    <a class="main-nav-link" href="/categories">Categories</a>
+                
+                    <a class="main-nav-link" href="/tags">Tags</a>
+                
+                    <a class="main-nav-link" href="/proj">Projects</a>
+                
+                    <a class="main-nav-link" href="/book">Books</a>
+                
+                    <a class="main-nav-link" href="/about">About</a>
+                
+            </nav>
+            
+                
+                <nav id="sub-nav">
+                    <div class="profile" id="profile-nav">
+                        <a id="profile-anchor" href="javascript:;">
+                            <img class="avatar" src="/css/images/image_y.png" />
+                            <i class="fas fa-caret-down"></i>
+                        </a>
+                    </div>
+                </nav>
+            
+            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+        <button type="submit" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" placeholder="Type something..." />
+            <span class="ins-close ins-selectable"><i class="fas fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script>
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: 'Posts',
+            PAGES: 'Pages',
+            CATEGORIES: 'Categories',
+            TAGS: 'Tags',
+            UNTITLED: '(Untitled)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+<script src="/js/insight.js"></script>
+
+</div>
+        </div>
+    </div>
+    <div id="main-nav-mobile" class="header-sub header-inner">
+        <table class="menu outer">
+            <tr>
+                
+                    <td><a class="main-nav-link" href="/.">Home</a></td>
+                
+                    <td><a class="main-nav-link" href="/archives">Archives</a></td>
+                
+                    <td><a class="main-nav-link" href="/categories">Categories</a></td>
+                
+                    <td><a class="main-nav-link" href="/tags">Tags</a></td>
+                
+                    <td><a class="main-nav-link" href="/proj">Projects</a></td>
+                
+                    <td><a class="main-nav-link" href="/book">Books</a></td>
+                
+                    <td><a class="main-nav-link" href="/about">About</a></td>
+                
+                <td>
+                    
+    <div class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+    </div>
+
+                </td>
+            </tr>
+        </table>
+    </div>
+</header>
+
+        <div class="outer">
+            
+                
+
+<aside id="profile" class="profile-fixed">
+    <div class="inner profile-inner">
+        <div class="base-info profile-block">
+            <img id="avatar" src="/css/images/image_y.png" />
+            <h2 id="name">Roy Luo</h2>
+            <h3 id="title">Designer &amp; Developer</h3>
+            <span id="location"><i class="fas fa-map-marker-alt" style="padding-right: 5px"></i>Beijing, China</span>
+            <a id="follow" target="_blank" href="https://github.com/royhunter/">FOLLOW</a>
+        </div>
+        <div class="article-info profile-block">
+            <div class="article-info-block">
+                43
+                <span>posts</span>
+            </div>
+            <div class="article-info-block">
+                15
+                <span>tags</span>
+            </div>
+        </div>
+        
+        <div class="profile-block social-links">
+            <table>
+                <tr>
+                    
+                    
+                    <td>
+                        <a href="http://github.com/royhunter/" target="_blank" title="github" class=tooltip>
+                            <i class="fab fa-github"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://twitter.com/RoyLuoye" target="_blank" title="twitter" class=tooltip>
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://www.facebook/roy.luo.3367" target="_blank" title="facebook" class=tooltip>
+                            <i class="fab fa-facebook"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://cn.linkedin.com/in/royluoye" target="_blank" title="linkedin" class=tooltip>
+                            <i class="fab fa-linkedin"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="/atom.xml" target="_blank" title="rss" class=tooltip>
+                            <i class="fab fa-rss"></i>
+                        </a>
+                    </td>
+                    
+                </tr>
+            </table>
+        </div>
+        
+    </div>
+</aside>
+
+            
+            <section id="main"><article id="post-kvm-mmu-virtualization" class="article article-type-post" itemscope itemprop="blogPost">
+    <div class="article-inner">
+        
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+            KVM之内存虚拟化(KVM MMU Virtualization)
+        </h1>
+    
+
+                
+                    <div class="article-meta">
+                        
+    <div class="article-date">
+        <i class="fas fa-calendar-alt"></i>
+        <a href="/2016/03/13/kvm-mmu-virtualization/">
+            <time datetime="2016-03-13T12:42:10.000Z" itemprop="datePublished">2016-03-13</time>
+        </a>
+    </div>
+
+
+                        
+    <div class="article-category">
+    	<i class="fas fa-folder"></i>
+        <a class="article-category-link" href="/categories/KVM/">KVM</a>
+    </div>
+
+                        
+    <div class="article-tag">
+        <i class="fas fa-tag"></i>
+        <a class="tag-link" href="/tags/Virtualization/">Virtualization</a>
+    </div>
+
+                    </div>
+                
+            </header>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+        
+            
+            <p>内存虚拟化技术是虚拟化技术中的基石，今天和同事聊到了内存虚拟化的实现问题，发现KVM虚拟化技术系列中少了一篇这方面的实现分析，特此补上。</p>
+<p>内存虚拟化方案</p>
+<ol>
+<li><p>纯软件模拟（SOFTMMU)—ShadowPage</p>
+</li>
+<li><p>硬件辅助实现 —EPT</p>
+</li>
+</ol>
+<a id="more"></a>
+<h2 id="四种地址"><a href="#四种地址" class="headerlink" title="四种地址"></a>四种地址</h2><ol>
+<li><p>GVA - Guest虚拟地址</p>
+</li>
+<li><p>GPA - Guest物理地址</p>
+</li>
+<li><p>HVA - Host虚拟地址</p>
+</li>
+<li><p>HPA -Host物理地址</p>
+</li>
+</ol>
+<h3 id="4种地址的转换关系"><a href="#4种地址的转换关系" class="headerlink" title="4种地址的转换关系"></a>4种地址的转换关系</h3><ol>
+<li><p>GVA-&gt;GPA<br>Guest OS维护的页表进行传统的操作</p>
+</li>
+<li><p>GPA-&gt;HVA<br>KVM的虚拟机实际上运行在Qemu的进程上下文中。于是，虚拟机的物理内存实际上是Qemu进程的虚拟地址。Kvm要把虚拟机的物理内存分成几个slot。这是因为，对计算机系统来说，物理地址是不连续的，除了bios和显存要编入内存地址，设备的内存也可能映射到内存了，所以内存实际上是分为一段段的。</p>
+</li>
+</ol>
+<p><img src="http://7jpnjo.com1.z0.glb.clouddn.com/mmu-1.PNG" alt=""></p>
+<h3 id="QEMU中物理内存的注册"><a href="#QEMU中物理内存的注册" class="headerlink" title="QEMU中物理内存的注册"></a>QEMU中物理内存的注册</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">kvm_set_phys_mem()-&gt;</span><br><span class="line">kvm_set_user_memory_region()-&gt;</span><br><span class="line">kvm_vm_ioctl() 进入kernel-&gt;</span><br><span class="line">KVM_SET_USER_MEMORY_REGION-&gt;</span><br><span class="line">kvm_vm_ioctl_set_memory_region()-&gt;</span><br><span class="line">__kvm_set_memory_region()</span><br></pre></td></tr></table></figure>
+<h3 id="重要数据结构"><a href="#重要数据结构" class="headerlink" title="重要数据结构"></a>重要数据结构</h3><p>QEMU对guest物理内存分段的的描述：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">KVMSlot</span></span></span><br><span class="line"><span class="class">&#123;</span></span><br><span class="line">     hwaddr start_addr;               Guest物理地址块的起始地址</span><br><span class="line">     <span class="keyword">ram_addr_t</span> memory_size;          大小</span><br><span class="line">     <span class="keyword">void</span> *ram;                       QUMU用户空间地址 </span><br><span class="line">     <span class="keyword">int</span> slot;                        slot id</span><br><span class="line">     <span class="keyword">int</span> flags;</span><br><span class="line">&#125; KVMSlot;</span><br></pre></td></tr></table></figure>
+<p>指定了vm的物理地址，同时指定了Qemu分配的用户地址，前面一个地址是GPA，后<br>面一个地址是HVA。可见，一个memslot就是建立了GPA到HVA的映射关系。</p>
+<p>内核态描述结构：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">kvm_memslots</span> &#123;</span></span><br><span class="line">	<span class="keyword">int</span> nmemslots;                      slot number</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">kvm_memory_slot</span> <span class="title">memslots</span>[<span class="title">KVM_MEMORY_SLOTS</span> + <span class="title">KVM_PRIVATE_MEM_SLOTS</span>];</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">kvm_memory_slot</span> &#123;</span></span><br><span class="line">	<span class="keyword">gfn_t</span> base_gfn;                     该块物理内存块所在guest 物理页帧号</span><br><span class="line">	<span class="keyword">unsigned</span> <span class="keyword">long</span> npages;               该块物理内存块占用的page数</span><br><span class="line">	<span class="keyword">unsigned</span> <span class="keyword">long</span> flags;</span><br><span class="line">	<span class="keyword">unsigned</span> <span class="keyword">long</span> *rmap;                分配该块物理内存对应的host内核虚拟地址（vmalloc分配）</span><br><span class="line">	<span class="keyword">unsigned</span> <span class="keyword">long</span> *dirty_bitmap;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> &#123;</span></span><br><span class="line">		<span class="keyword">unsigned</span> <span class="keyword">long</span> rmap_pde;</span><br><span class="line">		<span class="keyword">int</span> write_count;</span><br><span class="line">	&#125; *lpage_info[KVM_NR_PAGE_SIZES - <span class="number">1</span>];</span><br><span class="line">	<span class="keyword">unsigned</span> <span class="keyword">long</span> userspace_addr;       用户空间地址（QEMU)</span><br><span class="line">	<span class="keyword">int</span> user_alloc;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<h3 id="guest物理页框到HVA转换"><a href="#guest物理页框到HVA转换" class="headerlink" title="guest物理页框到HVA转换"></a>guest物理页框到HVA转换</h3><p>hva=base_hva+(gfn-base_gfn)*PAGE_SIZE</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">unsigned</span> <span class="keyword">long</span> <span class="title">gfn_to_hva</span><span class="params">(struct kvm *kvm, <span class="keyword">gfn_t</span> gfn)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line"> <span class="class"><span class="keyword">struct</span> <span class="title">kvm_memory_slot</span> *<span class="title">slot</span>;</span></span><br><span class="line"> gfn = unalias_gfn_instantiation(kvm, gfn);</span><br><span class="line"> slot = gfn_to_memslot_unaliased(kvm, gfn);</span><br><span class="line"> <span class="keyword">if</span> (!slot || slot-&gt;flags &amp; KVM_MEMSLOT_INVALID)</span><br><span class="line">    <span class="keyword">return</span> bad_hva();</span><br><span class="line"> <span class="keyword">return</span> (slot-&gt;userspace_addr + (gfn - slot-&gt;base_gfn) * PAGE_SIZE);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="影子页表-Shadow-Page-Table"><a href="#影子页表-Shadow-Page-Table" class="headerlink" title="影子页表 (Shadow Page Table)"></a>影子页表 (Shadow Page Table)</h2><p>Guest OS所维护的页表负责传统的从guest虚拟地址GVA到guest物理地址GPA的转换。如果MMU直接装载guest OS所维护的页表来进行内存访问，那么由于页表中每项所记录的都是GPA，MMU无法实现地址翻译。</p>
+<p>解决方案：影子页表 (Shadow Page Table)<br>作用：GVA直接到HPA的地址翻译,真正被VMM载入到物理MMU中的页表是影子页表；<br><img src="http://7jpnjo.com1.z0.glb.clouddn.com/mmu-2.PNG" alt=""></p>
+<h3 id="影子映射关系"><a href="#影子映射关系" class="headerlink" title="影子映射关系"></a>影子映射关系</h3><p>SPD是PD的影子页表，SPT1/SPT2是PT1/PT2的影子页表。由于客户PDE和PTE给出的页表基址和页基址并不是真正的物理地址，所以我们采用虚线表示PDE到GUEST页表以及PTE到普通GUEST页的映射关系。<br><img src="http://7jpnjo.com1.z0.glb.clouddn.com/mmu-3.PNG" alt=""></p>
+<h3 id="影子页表的建立"><a href="#影子页表的建立" class="headerlink" title="影子页表的建立"></a>影子页表的建立</h3><ul>
+<li>开始时，VMM中的与guest OS所拥有的页表相对应的影子页表是空的；</li>
+<li>而影子页表又是载入到CR3中真正为物理MMU所利用进行寻址的页表，因此开始时任何的内存访问操作都会引起缺页异常；导致vm发生VM Exit；进入handle_exception();<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (is_page_fault(intr_info)) &#123;</span><br><span class="line">		<span class="comment">/* EPT won't cause page fault directly */</span></span><br><span class="line">		BUG_ON(enable_ept);</span><br><span class="line">		cr2 = vmcs_readl(EXIT_QUALIFICATION);</span><br><span class="line">		trace_kvm_page_fault(cr2, error_code);</span><br><span class="line"></span><br><span class="line">		<span class="keyword">if</span> (kvm_event_needs_reinjection(vcpu))</span><br><span class="line">			kvm_mmu_unprotect_page_virt(vcpu, cr2);</span><br><span class="line">		<span class="keyword">return</span> kvm_mmu_page_fault(vcpu, cr2, error_code, <span class="literal">NULL</span>, <span class="number">0</span>);</span><br><span class="line">	&#125;</span><br></pre></td></tr></table></figure>
+</li>
+</ul>
+<p>获得缺页异常发生时的CR2,及当时访问的虚拟地址；<br>进入kvm_mmu_page_fault()(vmx.c)-&gt;<br>r = vcpu-&gt;arch.mmu.page_fault(vcpu, cr2, error_code);(mmu.c)-&gt;<br>FNAME(page_fault)(struct kvm_vcpu *vcpu, gva_t addr, u32 error_code)(paging_tmpl.h)-&gt;<br>FNAME(walk_addr)()   查guest页表，物理地址是否存在， 这时肯定是不存在的<br>The page is not mapped by the guest.  Let the guest handle it.<br>inject_page_fault()-&gt;kvm_inject_page_fault()   异常注入流程；</p>
+<ul>
+<li>Guest OS修改从GVA-&gt;GPA的映射关系填入页表；</li>
+<li>继续访问，由于影子页表仍是空，再次发生缺页异常；</li>
+<li>FNAME(page_fault)-&gt;</li>
+<li>FNAME(walk_addr)()   查guest页表，物理地址映射均是存在-&gt;</li>
+<li>FNAME(fetch):<br>  遍历影子页表，完成创建影子页表（填充影子页表）;<br>  在填充过程中，将客户机页目录结构页对应影子页表页表项标记为写保护，目的截获对于页目录的修改（页目录也是内存页的一部分，在页表中也是有映射的，guest对页目录有写权限，那么在影子页表的页目录也是可写的，这样对页目录的修改导致VMM失去截获的机会）</li>
+</ul>
+<h3 id="影子页表的填充"><a href="#影子页表的填充" class="headerlink" title="影子页表的填充"></a>影子页表的填充</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">shadow_page = kvm_mmu_get_page(vcpu, table_gfn, addr, level<span class="number">-1</span>, direct, access, sptep);</span><br><span class="line">index = kvm_page_table_hashfn(gfn);</span><br><span class="line">hlist_for_each_entry_safe</span><br><span class="line"><span class="keyword">if</span> (sp-&gt;gfn == gfn)</span><br><span class="line">&#123;……&#125;</span><br><span class="line"><span class="keyword">else</span></span><br><span class="line">&#123;sp = kvm_mmu_alloc_page(vcpu, parent_pte);&#125;</span><br></pre></td></tr></table></figure>
+<p>为了快速检索GUEST页表所对应的的影子页表，KVM 为每个GUEST都维护了一个哈希<br>表，影子页表和GUEST页表通过此哈希表进行映射。对于每一个GUEST来说，GUEST<br>的页目录和页表都有唯一的GUEST物理地址，通过页目录/页表的客户机物理地址就<br>可以在哈希链表中快速地找到对应的影子页目录/页表。</p>
+<h3 id="影子页表的缓存"><a href="#影子页表的缓存" class="headerlink" title="影子页表的缓存"></a>影子页表的缓存</h3><ul>
+<li>Guest OS修改从GVA-&gt;GPA的映射关系，为保证一致性，VMM必须对影子页表也做相应的维护，这样，VMM必须截获这样的内存访问操作；</li>
+<li>导致VM Exit的机会<ol>
+<li>INVLPG</li>
+<li>MOV TO CR3</li>
+<li>TASK SWITCH（发生MOV TO CR3 ）</li>
+</ol>
+</li>
+<li>以INVLPG触发VM Exit为例：</li>
+<li>static void FNAME(invlpg)(struct kvm_vcpu *vcpu, gva_t gva)<ul>
+<li>Paging_tmpl.h</li>
+<li>影子页表项的内容无效</li>
+</ul>
+</li>
+<li>GUEST在切换CR3时，VMM需要清空整个TLB，使所有影子页表的内容无效。在多进程GUEST操作系统中，CR3将被频繁地切换，某些影子页表的内容可能很快就会被再次用到，而重建影子页表是一项十分耗时的工作，这里需要缓存影子页表，即GUEST切换CR3时不清空影子页表。</li>
+</ul>
+<h2 id="影子页表方案总结"><a href="#影子页表方案总结" class="headerlink" title="影子页表方案总结"></a>影子页表方案总结</h2><p>内存虚拟化的两次转换：<br>    GVA-&gt;GPA   (GUEST的页表实现)<br>    GPA-&gt;HPA   (VMM进行转换)</p>
+<p>影子页表将两次转换合一<br>    根据GVA-&gt;GPA-&gt;HPA 计算出GVA-&gt;HPA,填入影子页表</p>
+<p>优点：<br>    由于影子页表可被载入物理 MMU 为客户机直接寻址使用，所以客户机的大多数内存访问都可以在没有 KVM 介入的情况下正常执行，没有额外的地址转换开销，也就大大提高了客户机运行的效率。</p>
+<p>缺点：<br>    1、KVM 需要为每个客户机的每个进程的页表都要维护一套相应的影子页表，这会带来较大内存上的额外开销;<br>    2、客户在读写CR3、执行INVLPG指令或客户页表不完整等情况下均会导致VM exit，这导致了内存虚拟化效率很低<br>    3、客户机页表和和影子页表的同步也比较复杂。</p>
+<p>因此，Intel 的 EPT(Extent Page Table) 技术和 AMD 的 NPT(Nest Page Table) 技术都对内存虚拟化提供了硬件支持。这两种技术原理类似，都是在硬件层面上实现客户机虚拟地址到宿主机物理地址之间的转换。</p>
+<h2 id="硬件辅助方案EPT（Extended-Page-Table）"><a href="#硬件辅助方案EPT（Extended-Page-Table）" class="headerlink" title="硬件辅助方案EPT（Extended Page Table）"></a>硬件辅助方案EPT（Extended Page Table）</h2><p>VT-x提供了Extended Page Table(EPT)技术<br>硬件上直接支持GVA-&gt;GPA-&gt;HPA的两次地址转换<br>原理：</p>
+<pre><code>1. 在原有的CR3页表地址映射的基础上，EPT引入了EPT页表来实现另一次映射。
+2. GVA-&gt;GPA-&gt;HPA两次地址转换都由CPU硬件来完成。
+</code></pre><p><img src="http://7jpnjo.com1.z0.glb.clouddn.com/mmu-4.PNG" alt=""></p>
+<h3 id="二维地址翻译结构"><a href="#二维地址翻译结构" class="headerlink" title="二维地址翻译结构"></a>二维地址翻译结构</h3><ul>
+<li>Guest维护自身的客户页表:GVA-&gt;GPA</li>
+<li>EPT维护GPA-&gt;HPA的映射</li>
+</ul>
+<h3 id="流程"><a href="#流程" class="headerlink" title="流程"></a>流程</h3><ol>
+<li>处于非根模式的CPU加载guest进程的gCR3;</li>
+<li>gCR3是GPA,cpu需要通过查询EPT页表来实现GPA-&gt;HPA；</li>
+<li>如果没有，CPU触发EPT Violation,由VMM截获处理；</li>
+<li>假设客户机有m级页表，宿主机EPT有n级，在TLB均miss的最坏情况下，会产生m*n次内存访问，完成一次客户机的地址翻译；</li>
+</ol>
+<p><img src="http://7jpnjo.com1.z0.glb.clouddn.com/mmu-5.PNG" alt=""></p>
+<h3 id="EPT页表的建立流程"><a href="#EPT页表的建立流程" class="headerlink" title="EPT页表的建立流程"></a>EPT页表的建立流程</h3><ol>
+<li>初始情况下：Guest CR3指向的Guest物理页面为空页面；</li>
+<li>Guest页表缺页异常，KVM采用不处理Guest页表缺页的机制，不会导致VM Exit，由Guest的缺页异常处理函数负责分配一个Guest物理页面（GPA），将该页面物理地址回填，建立Guest页表结构；</li>
+<li>完成该映射的过程需要将GPA翻译到HPA，此时该进程相应的EPT页表为空，产生EPT_VIOLATION，虚拟机退出到根模式下执行，由KVM捕获该异常，建立该GPA到HOST物理地址HPA的映射，完成一套EPT页表的建立，中断返回，切换到非根模式继续运行。</li>
+<li>VCPU的mmu查询下一级Guest页表，根据GVA的偏移产生一条新的GPA，Guest寻址该GPA对应页面，产生Guest缺页，不发生VM_Exit，由Guest系统的缺页处理函数捕获该异常，从Guest物理内存中选择一个空闲页，将该Guest物理地址GPA回填给Guest页表；</li>
+<li>此时该GPA对应的EPT页表项不存在，发生EPT_VIOLATION，切换到根模式下，由KVM负责建立该GPA-&gt;HPA映射，再切换回非根模式；</li>
+<li>如此往复，直到非根模式下GVA最后的偏移建立最后一级Guest页表，分配GPA，缺页异常退出到根模式建立最后一套EPT页表。</li>
+<li>至此，一条GVA对应在真实物理内存单元中的内容，便可通过这一套二维页表结构获得。</li>
+</ol>
+<h3 id="硬件支持"><a href="#硬件支持" class="headerlink" title="硬件支持"></a>硬件支持</h3><ul>
+<li>VMCS的“VMCS-Execution”:Enable EPT字段，置位后EPT功能使能，CPU会使用EPT功能进行两次转换；</li>
+<li>EPT页表的基地址是VMCS的“VMCS-Execution”：Extended page table pointer字段；</li>
+</ul>
+<h3 id="Code"><a href="#Code" class="headerlink" title="Code"></a>Code</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line">vcpu_enter_guest()-&gt;</span><br><span class="line">kvm_mmu_reload()-&gt;</span><br><span class="line">kvm_mmu_load()-&gt;</span><br><span class="line">vmx_set_cr3()</span><br><span class="line"></span><br><span class="line">```c</span><br><span class="line">static void vmx_set_cr3(struct kvm_vcpu *vcpu, unsigned long cr3)</span><br><span class="line">&#123;</span><br><span class="line">	unsigned long guest_cr3;</span><br><span class="line">	u64 eptp;</span><br><span class="line"></span><br><span class="line">	guest_cr3 = cr3;</span><br><span class="line">	<span class="keyword">if</span> (enable_ept) &#123;</span><br><span class="line">		eptp = construct_eptp(cr3);</span><br><span class="line">		vmcs_write64(EPT_POINTER, eptp);</span><br><span class="line">		<span class="keyword">if</span> (is_paging(vcpu) || is_guest_mode(vcpu))</span><br><span class="line">			guest_cr3 = kvm_read_cr3(vcpu);</span><br><span class="line">		<span class="keyword">else</span></span><br><span class="line">			guest_cr3 = vcpu-&gt;kvm-&gt;arch.ept_identity_map_addr;</span><br><span class="line">		ept_load_pdptrs(vcpu);</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	vmx_flush_tlb(vcpu);</span><br><span class="line">	vmcs_writel(GUEST_CR3, guest_cr3);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">vmx_handle_exit()-&gt;</span><br><span class="line">	[EXIT_REASON_EPT_VIOLATION] = handle_ept_violation;</span><br><span class="line">Handle_ept_violation()-&gt;</span><br><span class="line">kvm_mmu_page_fault()-&gt;</span><br><span class="line">tdp_page_fault()-&gt;</span><br><span class="line">gfn_to_pfn(); GPA到HPA的转化分两步完成，分别通过gfn_to_hva、hva_to_pfn两个函数完成</span><br><span class="line">__direct_map(); 建立EPT页表结构</span><br></pre></td></tr></table></figure>
+<p>Guest运行过程中，首先获得gCR3的客户页帧号(右移PAGE_SIZE)，根据其所在memslot区域获得其对应的HVA，再由HVA转化为HPA，得到宿主页帧号。若GPA-&gt;HPA的映射不存在，将会触发VM-Exit，KVM负责捕捉该异常，并交由KVM的缺页中断机制进行相应的缺页处理。kvm_vmx_exit_handlers函数数组中，保存着全部VM-Exit的处理函数，它由kvm_x86_ops的vmx_handle_exit负责调用。缺页异常的中断号为EXIT_REASON_EPT_VIOLATION，对应由handle_ept_violation函数进行处理。<br>tdp_page_fault是EPT的缺页处理函数,负责完成GPA-&gt;HPA转化.而传给tdp_page_fault的GPA是通过vmcs_read64函数(VMREAD指令)获得的.<br>gpa = vmcs_read64(GUEST_PHYSICAL_ADDRESS);</p>
+
+        
+        </div>
+        <footer class="article-footer">
+            <div class="share-container">
+
+
+
+</div>
+
+    <a data-url="http://royhunter.github.io/2016/03/13/kvm-mmu-virtualization/" data-id="ck2oe6fo5001pxkkv46h18ji4" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+<script>
+    (function ($) {
+        // Prevent duplicate binding
+        if (typeof(__SHARE_BUTTON_BINDED__) === 'undefined' || !__SHARE_BUTTON_BINDED__) {
+            __SHARE_BUTTON_BINDED__ = true;
+        } else {
+            return;
+        }
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url'),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="fab fa-twitter article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="fab fa-facebook article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="fab fa-pinterest article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                            '<a href="https://plus.google.com/share?url=' + encodedUrl + '" class="fab fa-google article-share-google" target="_blank" title="Google+"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+            
+    
+
+        </footer>
+    </div>
+    
+        
+<nav id="article-nav">
+    
+        <a href="/2016/03/16/raft/" id="article-nav-newer" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Newer</strong>
+            <div class="article-nav-title">
+                
+                    Distributed Concensus:Raft
+                
+            </div>
+        </a>
+    
+    
+        <a href="/2016/02/25/conhash/" id="article-nav-older" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Older</strong>
+            <div class="article-nav-title">一致性哈希算法(Consistent Hashing)及Golang实现</div>
+        </a>
+    
+</nav>
+
+
+    
+</article>
+
+
+    
+    
+
+</section>
+            
+                
+<aside id="sidebar">
+   
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">recent</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2020/07/12/index/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"></p>
+                            <p class="item-title"><a href="/2020/07/12/index/" class="title">Blog索引</a></p>
+                            <p class="item-date"><time datetime="2020-07-12T13:33:28.000Z" itemprop="datePublished">2020-07-12</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/07/17/ovs02-vxlan/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/07/17/ovs02-vxlan/" class="title">OVS02-VXLAN内核相关实现</a></p>
+                            <p class="item-date"><time datetime="2018-07-17T12:15:34.000Z" itemprop="datePublished">2018-07-17</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/01/10/perf-tunning/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/01/10/perf-tunning/" class="title">datapath性能优化总结</a></p>
+                            <p class="item-date"><time datetime="2018-01-10T13:26:32.000Z" itemprop="datePublished">2018-01-10</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2017/04/18/ovs01/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2017/04/18/ovs01/" class="title">OVS01-OVS基础-安装、配置、Simple Case</a></p>
+                            <p class="item-date"><time datetime="2017-04-18T13:26:32.000Z" itemprop="datePublished">2017-04-18</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2016/08/28/trampolines-for-nested-functions/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Programme/">Programme</a></p>
+                            <p class="item-title"><a href="/2016/08/28/trampolines-for-nested-functions/" class="title">Trampolines for Nested Functions in GCC</a></p>
+                            <p class="item-date"><time datetime="2016-08-28T13:26:32.000Z" itemprop="datePublished">2016-08-28</time></p>
+                        </div>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">categories</h3>
+        <div class="widget">
+            <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Algorithm/">Algorithm</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Container/">Container</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Docker/">Docker</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Hyper-V/">Hyper-V</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/KVM/">KVM</a><span class="category-list-count">22</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Misc/">Misc</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/PROGRAMME/">PROGRAMME</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Programme/">Programme</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Virtualization/">Virtualization</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/go/">go</a><span class="category-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">archives</h3>
+        <div class="widget">
+            <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">July 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">July 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">January 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">April 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">August 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/06/">June 2016</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/05/">May 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/03/">March 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/02/">February 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/01/">January 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/12/">December 2015</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/11/">November 2015</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/08/">August 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/07/">July 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/06/">June 2014</a><span class="archive-list-count">5</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tags</h3>
+        <div class="widget">
+            <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Container/">Container</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Distribute/">Distribute</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/EPT/">EPT</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux-namespace/">Linux namespace</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Network/">Network</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/PROGRAMME/">PROGRAMME</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Programme-Language/">Programme Language</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/QEMU/">QEMU</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Tools/">Tools</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization/">Virtualization</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization-KVM-QEMU/">Virtualization KVM QEMU</a><span class="tag-list-count">9</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/libvirt/">libvirt</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vhost/">vhost</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/virtio/">virtio</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vps-proxy/">vps_proxy</a><span class="tag-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tag cloud</h3>
+        <div class="widget tagcloud">
+            <a href="/tags/Container/" style="font-size: 12.5px;">Container</a> <a href="/tags/Distribute/" style="font-size: 12.5px;">Distribute</a> <a href="/tags/EPT/" style="font-size: 12.5px;">EPT</a> <a href="/tags/Linux-namespace/" style="font-size: 12.5px;">Linux namespace</a> <a href="/tags/Network/" style="font-size: 15px;">Network</a> <a href="/tags/PROGRAMME/" style="font-size: 10px;">PROGRAMME</a> <a href="/tags/Programme-Language/" style="font-size: 10px;">Programme Language</a> <a href="/tags/QEMU/" style="font-size: 12.5px;">QEMU</a> <a href="/tags/Tools/" style="font-size: 12.5px;">Tools</a> <a href="/tags/Virtualization/" style="font-size: 17.5px;">Virtualization</a> <a href="/tags/Virtualization-KVM-QEMU/" style="font-size: 20px;">Virtualization KVM QEMU</a> <a href="/tags/libvirt/" style="font-size: 10px;">libvirt</a> <a href="/tags/vhost/" style="font-size: 10px;">vhost</a> <a href="/tags/virtio/" style="font-size: 17.5px;">virtio</a> <a href="/tags/vps-proxy/" style="font-size: 10px;">vps_proxy</a>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">links</h3>
+        <div class="widget">
+            <ul>
+                
+                    <li>
+                        <a href="http://hexo.io">Hexo</a>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+
+    
+    <div id="toTop" class="fas fa-angle-up"></div>
+</aside>
+
+            
+        </div>
+        <footer id="footer">
+    <div class="outer">
+        <div id="footer-info" class="inner">
+            &copy; 2019 John Doe<br>
+            Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>. Theme by <a href="http://github.com/ppoffice">PPOffice</a>
+        </div>
+    </div>
+</footer>
+        
+
+
+    
+        <script src="/libs/lightgallery/js/lightgallery.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-thumbnail.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-pager.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-autoplay.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-fullscreen.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-zoom.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-hash.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-share.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-video.min.js"></script>
+    
+    
+        <script src="/libs/justified-gallery/jquery.justifiedGallery.min.js"></script>
+    
+    
+
+
+
+<!-- Custom Scripts -->
+<script src="/js/main.js"></script>
+
+    </div>
+</body>
+</html>

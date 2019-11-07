@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <meta charset="utf-8">
+    
+    <title>OVS02-VXLAN内核相关实现 | RoyLuo&#39;s Notes</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="description" content="VXLAN内核相关实现分析.">
+<meta name="keywords" content="Network">
+<meta property="og:type" content="article">
+<meta property="og:title" content="OVS02-VXLAN内核相关实现">
+<meta property="og:url" content="http://royhunter.github.io/2018/07/17/ovs02-vxlan/index.html">
+<meta property="og:site_name" content="RoyLuo&#39;s Notes">
+<meta property="og:description" content="VXLAN内核相关实现分析.">
+<meta property="og:locale" content="en">
+<meta property="og:image" content="http://7j1zal.com1.z0.glb.clouddn.com/vxlan.png">
+<meta property="og:updated_time" content="2018-07-18T13:39:34.578Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="OVS02-VXLAN内核相关实现">
+<meta name="twitter:description" content="VXLAN内核相关实现分析.">
+<meta name="twitter:image" content="http://7j1zal.com1.z0.glb.clouddn.com/vxlan.png">
+    
+
+    
+        <link rel="alternate" href="atom.xml" title="RoyLuo&#39;s Notes" type="application/atom+xml" />
+    
+
+    
+
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fontawesome.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-brands.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-solid.min.css">
+    <link rel="stylesheet" href="/libs/open-sans/styles.css">
+    <link rel="stylesheet" href="/libs/source-code-pro/styles.css">
+
+    <link rel="stylesheet" href="/css/style.css">
+
+    <script src="/libs/jquery/2.1.3/jquery.min.js"></script>
+    
+    
+        <link rel="stylesheet" href="/libs/lightgallery/css/lightgallery.min.css">
+    
+    
+        <link rel="stylesheet" href="/libs/justified-gallery/justifiedGallery.min.css">
+    
+    
+    
+    
+
+
+</head>
+
+<body>
+    <div id="container">
+        <header id="header">
+    <div id="header-main" class="header-inner">
+        <div class="outer">
+            <a href="/" id="logo">
+                <i class="logo"></i>
+                <span class="site-title">RoyLuo&#39;s Notes</span>
+            </a>
+            <nav id="main-nav">
+                
+                    <a class="main-nav-link" href="/.">Home</a>
+                
+                    <a class="main-nav-link" href="/archives">Archives</a>
+                
+                    <a class="main-nav-link" href="/categories">Categories</a>
+                
+                    <a class="main-nav-link" href="/tags">Tags</a>
+                
+                    <a class="main-nav-link" href="/proj">Projects</a>
+                
+                    <a class="main-nav-link" href="/book">Books</a>
+                
+                    <a class="main-nav-link" href="/about">About</a>
+                
+            </nav>
+            
+                
+                <nav id="sub-nav">
+                    <div class="profile" id="profile-nav">
+                        <a id="profile-anchor" href="javascript:;">
+                            <img class="avatar" src="/css/images/image_y.png" />
+                            <i class="fas fa-caret-down"></i>
+                        </a>
+                    </div>
+                </nav>
+            
+            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+        <button type="submit" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" placeholder="Type something..." />
+            <span class="ins-close ins-selectable"><i class="fas fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script>
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: 'Posts',
+            PAGES: 'Pages',
+            CATEGORIES: 'Categories',
+            TAGS: 'Tags',
+            UNTITLED: '(Untitled)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+<script src="/js/insight.js"></script>
+
+</div>
+        </div>
+    </div>
+    <div id="main-nav-mobile" class="header-sub header-inner">
+        <table class="menu outer">
+            <tr>
+                
+                    <td><a class="main-nav-link" href="/.">Home</a></td>
+                
+                    <td><a class="main-nav-link" href="/archives">Archives</a></td>
+                
+                    <td><a class="main-nav-link" href="/categories">Categories</a></td>
+                
+                    <td><a class="main-nav-link" href="/tags">Tags</a></td>
+                
+                    <td><a class="main-nav-link" href="/proj">Projects</a></td>
+                
+                    <td><a class="main-nav-link" href="/book">Books</a></td>
+                
+                    <td><a class="main-nav-link" href="/about">About</a></td>
+                
+                <td>
+                    
+    <div class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+    </div>
+
+                </td>
+            </tr>
+        </table>
+    </div>
+</header>
+
+        <div class="outer">
+            
+                
+
+<aside id="profile" class="profile-fixed">
+    <div class="inner profile-inner">
+        <div class="base-info profile-block">
+            <img id="avatar" src="/css/images/image_y.png" />
+            <h2 id="name">Roy Luo</h2>
+            <h3 id="title">Designer &amp; Developer</h3>
+            <span id="location"><i class="fas fa-map-marker-alt" style="padding-right: 5px"></i>Beijing, China</span>
+            <a id="follow" target="_blank" href="https://github.com/royhunter/">FOLLOW</a>
+        </div>
+        <div class="article-info profile-block">
+            <div class="article-info-block">
+                43
+                <span>posts</span>
+            </div>
+            <div class="article-info-block">
+                15
+                <span>tags</span>
+            </div>
+        </div>
+        
+        <div class="profile-block social-links">
+            <table>
+                <tr>
+                    
+                    
+                    <td>
+                        <a href="http://github.com/royhunter/" target="_blank" title="github" class=tooltip>
+                            <i class="fab fa-github"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://twitter.com/RoyLuoye" target="_blank" title="twitter" class=tooltip>
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://www.facebook/roy.luo.3367" target="_blank" title="facebook" class=tooltip>
+                            <i class="fab fa-facebook"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://cn.linkedin.com/in/royluoye" target="_blank" title="linkedin" class=tooltip>
+                            <i class="fab fa-linkedin"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="/atom.xml" target="_blank" title="rss" class=tooltip>
+                            <i class="fab fa-rss"></i>
+                        </a>
+                    </td>
+                    
+                </tr>
+            </table>
+        </div>
+        
+    </div>
+</aside>
+
+            
+            <section id="main"><article id="post-ovs02-vxlan" class="article article-type-post" itemscope itemprop="blogPost">
+    <div class="article-inner">
+        
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+            OVS02-VXLAN内核相关实现
+        </h1>
+    
+
+                
+                    <div class="article-meta">
+                        
+    <div class="article-date">
+        <i class="fas fa-calendar-alt"></i>
+        <a href="/2018/07/17/ovs02-vxlan/">
+            <time datetime="2018-07-17T12:15:34.000Z" itemprop="datePublished">2018-07-17</time>
+        </a>
+    </div>
+
+
+                        
+    <div class="article-category">
+    	<i class="fas fa-folder"></i>
+        <a class="article-category-link" href="/categories/Virtualization/">Virtualization</a>
+    </div>
+
+                        
+    <div class="article-tag">
+        <i class="fas fa-tag"></i>
+        <a class="tag-link" href="/tags/Network/">Network</a>
+    </div>
+
+                    </div>
+                
+            </header>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+        
+            
+            <p>VXLAN内核相关实现分析.</p>
+<a id="more"></a>
+<h2 id="OVS-VXLAN-tunnel-相关配置命令"><a href="#OVS-VXLAN-tunnel-相关配置命令" class="headerlink" title="OVS VXLAN tunnel 相关配置命令"></a>OVS VXLAN tunnel 相关配置命令</h2><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">$ ovs-vsctl add-br br0</span><br><span class="line">$ ovs-vsctl add-port br0 vxlan1 -- <span class="built_in">set</span> interface vxlan1 <span class="built_in">type</span>=vxlan \</span><br><span class="line">    options:remote_ip=192.168.1.2 options:key=flow options:dst_port=8472</span><br><span class="line"><span class="comment">#ovs-vsctl show</span></span><br><span class="line">b62cd47f-50be-4d3e-a0a9-5ad3169added</span><br><span class="line">Bridge <span class="string">"br0"</span></span><br><span class="line">    Port <span class="string">"vxlan1"</span></span><br><span class="line">        Interface <span class="string">"vxlan1"</span></span><br><span class="line">            <span class="built_in">type</span>: vxlan</span><br><span class="line">            options: &#123;csum=<span class="string">"true"</span>, key=flow, remote_ip=<span class="string">"192.168.1.2"</span>, tos=inherit&#125;</span><br></pre></td></tr></table></figure>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">options: key=100    &lt;&lt;&lt;&lt;vni为100</span><br><span class="line">options: key=flow   &lt;&lt;&lt;&lt;vni由流表来处理</span><br><span class="line">options: remote_ip=192.168.1.2   &lt;&lt;&lt;&lt; remote vxlan vtep</span><br><span class="line">options: dst_port=8472  &lt;&lt;&lt;&lt; vxlan vtep UDP监听端口</span><br></pre></td></tr></table></figure>
+<h2 id="内核结构关系"><a href="#内核结构关系" class="headerlink" title="内核结构关系"></a>内核结构关系</h2><p><img src="http://7j1zal.com1.z0.glb.clouddn.com/vxlan.png" alt=""></p>
+<h2 id="几个关键的数据结构"><a href="#几个关键的数据结构" class="headerlink" title="几个关键的数据结构"></a>几个关键的数据结构</h2><h4 id="OVS支持的vport的类型，本文主要分析VXLAN"><a href="#OVS支持的vport的类型，本文主要分析VXLAN" class="headerlink" title="OVS支持的vport的类型，本文主要分析VXLAN"></a>OVS支持的vport的类型，本文主要分析VXLAN</h4><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">enum</span> ovs_vport_type &#123;</span><br><span class="line">	OVS_VPORT_TYPE_UNSPEC,</span><br><span class="line">	OVS_VPORT_TYPE_NETDEV,   <span class="comment">/* network device */</span></span><br><span class="line">	OVS_VPORT_TYPE_INTERNAL, <span class="comment">/* network device implemented by datapath */</span></span><br><span class="line">	OVS_VPORT_TYPE_GRE,      <span class="comment">/* GRE tunnel. */</span></span><br><span class="line">	OVS_VPORT_TYPE_VXLAN,	 <span class="comment">/* VXLAN tunnel. */</span>     &lt;&lt;&lt;&lt;&lt;&lt;&lt;VXLAN port</span><br><span class="line">	OVS_VPORT_TYPE_GENEVE,	 <span class="comment">/* Geneve tunnel. */</span></span><br><span class="line">	OVS_VPORT_TYPE_LISP = <span class="number">105</span>,  <span class="comment">/* LISP tunnel */</span></span><br><span class="line">	OVS_VPORT_TYPE_STT = <span class="number">106</span>, <span class="comment">/* STT tunnel */</span></span><br><span class="line">	__OVS_VPORT_TYPE_MAX</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<h4 id="vport-ovs-vsctl-add-port创建，ovs-port在kernel对应一个vport"><a href="#vport-ovs-vsctl-add-port创建，ovs-port在kernel对应一个vport" class="headerlink" title="vport  ovs-vsctl add-port创建，ovs port在kernel对应一个vport"></a>vport  ovs-vsctl add-port创建，ovs port在kernel对应一个vport</h4><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">vport</span> &#123;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">net_device</span> *<span class="title">dev</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">datapath</span>	*<span class="title">dp</span>;</span>   &lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;datapath, 也就是bridge</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">vport_portids</span> __<span class="title">rcu</span> *<span class="title">upcall_portids</span>;</span></span><br><span class="line">	u16 port_no;</span><br><span class="line"></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">hlist_node</span> <span class="title">hash_node</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">hlist_node</span> <span class="title">dp_hash_node</span>;</span></span><br><span class="line">	<span class="keyword">const</span> <span class="class"><span class="keyword">struct</span> <span class="title">vport_ops</span> *<span class="title">ops</span>;</span></span><br><span class="line"></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">detach_list</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">rcu_head</span> <span class="title">rcu</span>;</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<h4 id="vxlan-dev-一个vxlan-vport对应一个vxlan-dev"><a href="#vxlan-dev-一个vxlan-vport对应一个vxlan-dev" class="headerlink" title="vxlan dev, 一个vxlan vport对应一个vxlan dev"></a>vxlan dev, 一个vxlan vport对应一个vxlan dev</h4><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* Pseudo network device */</span></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">vxlan_dev</span> &#123;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">hlist_node</span> <span class="title">hlist</span>;</span>	<span class="comment">/* vni hash table */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span>  <span class="title">next</span>;</span>		<span class="comment">/* vxlan's per namespace list */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">vxlan_sock</span> __<span class="title">rcu</span> *<span class="title">vn4_sock</span>;</span>	<span class="comment">/* listening socket for IPv4 */</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">if</span> IS_ENABLED(CONFIG_IPV6)</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">vxlan_sock</span> __<span class="title">rcu</span> *<span class="title">vn6_sock</span>;</span>	<span class="comment">/* listening socket for IPv6 */</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">endif</span></span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">net_device</span> *<span class="title">dev</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">net</span>	  *<span class="title">net</span>;</span>		<span class="comment">/* netns for packet i/o */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">vxlan_rdst</span> <span class="title">default_dst</span>;</span>	<span class="comment">/* default destination */</span></span><br><span class="line">	u32		  flags;	<span class="comment">/* VXLAN_F_* in vxlan.h */</span></span><br><span class="line"></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">timer_list</span> <span class="title">age_timer</span>;</span></span><br><span class="line">	<span class="keyword">spinlock_t</span>	  hash_lock;</span><br><span class="line">	<span class="keyword">unsigned</span> <span class="keyword">int</span>	  addrcnt;</span><br><span class="line"></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">vxlan_config</span>	<span class="title">cfg</span>;</span></span><br><span class="line"></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">hlist_head</span> <span class="title">fdb_head</span>[<span class="title">FDB_HASH_SIZE</span>];</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<h4 id="VTEP-UDP-socket-信息"><a href="#VTEP-UDP-socket-信息" class="headerlink" title="VTEP, UDP socket 信息"></a>VTEP, UDP socket 信息</h4><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* per UDP socket information */</span></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">vxlan_sock</span> &#123;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">hlist_node</span> <span class="title">hlist</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">socket</span>	 *<span class="title">sock</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">hlist_head</span> <span class="title">vni_list</span>[<span class="title">VNI_HASH_SIZE</span>];</span>  &lt;&lt;&lt;&lt;&lt;Virtual Network hash table,用于索引vxlan_dev</span><br><span class="line">	<span class="keyword">atomic_t</span>	  refcnt;</span><br><span class="line">	u32		  flags;</span><br><span class="line"><span class="meta">#<span class="meta-keyword">ifdef</span> HAVE_UDP_OFFLOAD</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">udp_offload</span> <span class="title">udp_offloads</span>;</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">endif</span></span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<h2 id="主要的流程"><a href="#主要的流程" class="headerlink" title="主要的流程"></a>主要的流程</h2><h3 id="创建"><a href="#创建" class="headerlink" title="创建"></a>创建</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">ovs_vxlan_tnl_init</span><br><span class="line">    ovs_vport_ops_register(&amp;ovs_vxlan_netdev_vport_ops)</span><br><span class="line">        .create			= vxlan_create,</span><br><span class="line">        .send			= vxlan_xmit,</span><br><span class="line">    </span><br><span class="line">    ovs_vport_add()           <span class="comment">//vport.c</span></span><br><span class="line">        ops = ovs_vport_lookup()</span><br><span class="line">        ops-&gt;create()</span><br><span class="line">    </span><br><span class="line">    vport_ops.create: vxlan_create</span><br><span class="line">        vxlan_tnl_create();</span><br><span class="line">            vport = ovs_vport_alloc()</span><br><span class="line">            dev = vxlan_dev_create</span><br><span class="line">                rpl_vxlan_dev_create(vxlan_link_ops)     <span class="comment">// vxlan.c</span></span><br><span class="line">                    rtnl_create_link()</span><br><span class="line">                    vxlan_dev_configure()</span><br><span class="line">                        vxlan_ether_setup()</span><br><span class="line">                            dev-&gt;netdev_ops = &amp;vxlan_netdev_ether_ops;</span><br><span class="line">                        register_netdevice()    <span class="comment">// Linux net device</span></span><br><span class="line">                    rtnl_configure_link()</span><br><span class="line">                    </span><br><span class="line">        ovs_netdev_link();</span><br><span class="line">            vport-&gt;dev = dev;</span><br></pre></td></tr></table></figure>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">dev-&gt;netdev_ops = &amp;vxlan_netdev_ether_ops;   <span class="comment">// vxlan.c</span></span><br><span class="line">.ndo_open		= vxlan_open,</span><br><span class="line">.ndo_start_xmit		= vxlan_dev_xmit,</span><br></pre></td></tr></table></figure>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">vxlan_open()  <span class="comment">//vxlan.c</span></span><br><span class="line">    vxlan_sock_add(vxlan_dev)  <span class="comment">//vxlan_dev 与 udp sock的关联</span></span><br><span class="line">        __vxlan_sock_add()</span><br><span class="line">            vxlan_find_sock() <span class="comment">// 基于network namespace, address family and UDP port, shareable flag查找</span></span><br><span class="line">            vxlan_socket_create() <span class="comment">// if find_socket is null</span></span><br><span class="line">                sock = vxlan_create_sock()</span><br><span class="line">                    udp_sock_create()</span><br><span class="line">                        rpl_udp_sock_create4() <span class="comment">//udp_tunnel.c</span></span><br><span class="line">                    tunnel_cfg.encap_rcv = vxlan_rcv;    </span><br><span class="line">                setup_udp_tunnel_sock()</span><br><span class="line">                    rpl_setup_udp_tunnel_sock() <span class="comment">//Setup the given (UDP) sock to receive UDP encapsulated packets    udp_tunnel.c</span></span><br><span class="line">        vxlan_vs_add_dev(vxlan_sock, vxlan_dev)</span><br></pre></td></tr></table></figure>
+<h3 id="接收"><a href="#接收" class="headerlink" title="接收"></a>接收</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">vxlan_rcv() <span class="comment">//Callback from net/ipv4/udp.c to receive packets  vxlan.c</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">vxlan_dev</span> * <span class="title">vxlan</span> = <span class="title">vxlan_vs_find_vni</span>()  //这里好像只会找到第一个匹配的<span class="title">vxlan_dev</span></span></span><br><span class="line"><span class="class">    <span class="title">netdev_port_receive</span>(<span class="title">skb</span>) //<span class="title">skb</span>的<span class="title">dev</span>为<span class="title">vxlan_dev</span>    <span class="title">vxlan</span>解封装</span></span><br><span class="line"><span class="class">        <span class="title">vport</span> = <span class="title">ovs_netdev_get_vport</span>(<span class="title">skb</span>-&gt;<span class="title">dev</span>);</span></span><br><span class="line">        ovs_vport_receive(vport)   <span class="comment">// vport.c</span></span><br><span class="line">            ovs_flow_key_extract()</span><br><span class="line">            ovs_dp_process_packet()  &lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;进入内核流表核心查询流程</span><br></pre></td></tr></table></figure>
+<h3 id="发送"><a href="#发送" class="headerlink" title="发送"></a>发送</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">ovs_vport_send()</span><br><span class="line">    vport-&gt;ops-&gt;send(skb);</span><br><span class="line">    vxlan_xmit()</span><br><span class="line">        rpl_vxlan_xmit()</span><br><span class="line">            vxlan_xmit_one()</span><br><span class="line">                udp_tunnel_xmit_skb()    <span class="comment">// udp_tunnel.c</span></span><br><span class="line">                    rpl_iptunnel_xmit()  <span class="comment">// ip_tunnels_core.c</span></span><br><span class="line">                        ip_local_out()</span><br></pre></td></tr></table></figure>
+
+        
+        </div>
+        <footer class="article-footer">
+            <div class="share-container">
+
+
+
+</div>
+
+    <a data-url="http://royhunter.github.io/2018/07/17/ovs02-vxlan/" data-id="ck2oe6foi002oxkkvj3kdce7l" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+<script>
+    (function ($) {
+        // Prevent duplicate binding
+        if (typeof(__SHARE_BUTTON_BINDED__) === 'undefined' || !__SHARE_BUTTON_BINDED__) {
+            __SHARE_BUTTON_BINDED__ = true;
+        } else {
+            return;
+        }
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url'),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="fab fa-twitter article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="fab fa-facebook article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="fab fa-pinterest article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                            '<a href="https://plus.google.com/share?url=' + encodedUrl + '" class="fab fa-google article-share-google" target="_blank" title="Google+"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+            
+    
+
+        </footer>
+    </div>
+    
+        
+<nav id="article-nav">
+    
+        <a href="/2020/07/12/index/" id="article-nav-newer" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Newer</strong>
+            <div class="article-nav-title">
+                
+                    Blog索引
+                
+            </div>
+        </a>
+    
+    
+        <a href="/2018/01/10/perf-tunning/" id="article-nav-older" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Older</strong>
+            <div class="article-nav-title">datapath性能优化总结</div>
+        </a>
+    
+</nav>
+
+
+    
+</article>
+
+
+    
+    
+
+</section>
+            
+                
+<aside id="sidebar">
+   
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">recent</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2020/07/12/index/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"></p>
+                            <p class="item-title"><a href="/2020/07/12/index/" class="title">Blog索引</a></p>
+                            <p class="item-date"><time datetime="2020-07-12T13:33:28.000Z" itemprop="datePublished">2020-07-12</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/07/17/ovs02-vxlan/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/07/17/ovs02-vxlan/" class="title">OVS02-VXLAN内核相关实现</a></p>
+                            <p class="item-date"><time datetime="2018-07-17T12:15:34.000Z" itemprop="datePublished">2018-07-17</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/01/10/perf-tunning/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/01/10/perf-tunning/" class="title">datapath性能优化总结</a></p>
+                            <p class="item-date"><time datetime="2018-01-10T13:26:32.000Z" itemprop="datePublished">2018-01-10</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2017/04/18/ovs01/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2017/04/18/ovs01/" class="title">OVS01-OVS基础-安装、配置、Simple Case</a></p>
+                            <p class="item-date"><time datetime="2017-04-18T13:26:32.000Z" itemprop="datePublished">2017-04-18</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2016/08/28/trampolines-for-nested-functions/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Programme/">Programme</a></p>
+                            <p class="item-title"><a href="/2016/08/28/trampolines-for-nested-functions/" class="title">Trampolines for Nested Functions in GCC</a></p>
+                            <p class="item-date"><time datetime="2016-08-28T13:26:32.000Z" itemprop="datePublished">2016-08-28</time></p>
+                        </div>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">categories</h3>
+        <div class="widget">
+            <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Algorithm/">Algorithm</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Container/">Container</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Docker/">Docker</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Hyper-V/">Hyper-V</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/KVM/">KVM</a><span class="category-list-count">22</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Misc/">Misc</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/PROGRAMME/">PROGRAMME</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Programme/">Programme</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Virtualization/">Virtualization</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/go/">go</a><span class="category-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">archives</h3>
+        <div class="widget">
+            <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">July 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">July 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">January 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">April 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">August 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/06/">June 2016</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/05/">May 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/03/">March 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/02/">February 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/01/">January 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/12/">December 2015</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/11/">November 2015</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/08/">August 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/07/">July 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/06/">June 2014</a><span class="archive-list-count">5</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tags</h3>
+        <div class="widget">
+            <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Container/">Container</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Distribute/">Distribute</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/EPT/">EPT</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux-namespace/">Linux namespace</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Network/">Network</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/PROGRAMME/">PROGRAMME</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Programme-Language/">Programme Language</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/QEMU/">QEMU</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Tools/">Tools</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization/">Virtualization</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization-KVM-QEMU/">Virtualization KVM QEMU</a><span class="tag-list-count">9</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/libvirt/">libvirt</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vhost/">vhost</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/virtio/">virtio</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vps-proxy/">vps_proxy</a><span class="tag-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tag cloud</h3>
+        <div class="widget tagcloud">
+            <a href="/tags/Container/" style="font-size: 12.5px;">Container</a> <a href="/tags/Distribute/" style="font-size: 12.5px;">Distribute</a> <a href="/tags/EPT/" style="font-size: 12.5px;">EPT</a> <a href="/tags/Linux-namespace/" style="font-size: 12.5px;">Linux namespace</a> <a href="/tags/Network/" style="font-size: 15px;">Network</a> <a href="/tags/PROGRAMME/" style="font-size: 10px;">PROGRAMME</a> <a href="/tags/Programme-Language/" style="font-size: 10px;">Programme Language</a> <a href="/tags/QEMU/" style="font-size: 12.5px;">QEMU</a> <a href="/tags/Tools/" style="font-size: 12.5px;">Tools</a> <a href="/tags/Virtualization/" style="font-size: 17.5px;">Virtualization</a> <a href="/tags/Virtualization-KVM-QEMU/" style="font-size: 20px;">Virtualization KVM QEMU</a> <a href="/tags/libvirt/" style="font-size: 10px;">libvirt</a> <a href="/tags/vhost/" style="font-size: 10px;">vhost</a> <a href="/tags/virtio/" style="font-size: 17.5px;">virtio</a> <a href="/tags/vps-proxy/" style="font-size: 10px;">vps_proxy</a>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">links</h3>
+        <div class="widget">
+            <ul>
+                
+                    <li>
+                        <a href="http://hexo.io">Hexo</a>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+
+    
+    <div id="toTop" class="fas fa-angle-up"></div>
+</aside>
+
+            
+        </div>
+        <footer id="footer">
+    <div class="outer">
+        <div id="footer-info" class="inner">
+            &copy; 2019 John Doe<br>
+            Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>. Theme by <a href="http://github.com/ppoffice">PPOffice</a>
+        </div>
+    </div>
+</footer>
+        
+
+
+    
+        <script src="/libs/lightgallery/js/lightgallery.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-thumbnail.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-pager.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-autoplay.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-fullscreen.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-zoom.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-hash.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-share.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-video.min.js"></script>
+    
+    
+        <script src="/libs/justified-gallery/jquery.justifiedGallery.min.js"></script>
+    
+    
+
+
+
+<!-- Custom Scripts -->
+<script src="/js/main.js"></script>
+
+    </div>
+</body>
+</html>

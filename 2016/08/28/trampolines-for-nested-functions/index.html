@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <meta charset="utf-8">
+    
+    <title>Trampolines for Nested Functions in GCC | RoyLuo&#39;s Notes</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="description" content="C语言中关于内嵌函数的一些有意思的东西。">
+<meta name="keywords" content="Tools">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Trampolines for Nested Functions in GCC">
+<meta property="og:url" content="http://royhunter.github.io/2016/08/28/trampolines-for-nested-functions/index.html">
+<meta property="og:site_name" content="RoyLuo&#39;s Notes">
+<meta property="og:description" content="C语言中关于内嵌函数的一些有意思的东西。">
+<meta property="og:locale" content="en">
+<meta property="og:updated_time" content="2018-07-18T01:33:03.962Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Trampolines for Nested Functions in GCC">
+<meta name="twitter:description" content="C语言中关于内嵌函数的一些有意思的东西。">
+    
+
+    
+        <link rel="alternate" href="atom.xml" title="RoyLuo&#39;s Notes" type="application/atom+xml" />
+    
+
+    
+
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fontawesome.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-brands.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-solid.min.css">
+    <link rel="stylesheet" href="/libs/open-sans/styles.css">
+    <link rel="stylesheet" href="/libs/source-code-pro/styles.css">
+
+    <link rel="stylesheet" href="/css/style.css">
+
+    <script src="/libs/jquery/2.1.3/jquery.min.js"></script>
+    
+    
+        <link rel="stylesheet" href="/libs/lightgallery/css/lightgallery.min.css">
+    
+    
+        <link rel="stylesheet" href="/libs/justified-gallery/justifiedGallery.min.css">
+    
+    
+    
+    
+
+
+</head>
+
+<body>
+    <div id="container">
+        <header id="header">
+    <div id="header-main" class="header-inner">
+        <div class="outer">
+            <a href="/" id="logo">
+                <i class="logo"></i>
+                <span class="site-title">RoyLuo&#39;s Notes</span>
+            </a>
+            <nav id="main-nav">
+                
+                    <a class="main-nav-link" href="/.">Home</a>
+                
+                    <a class="main-nav-link" href="/archives">Archives</a>
+                
+                    <a class="main-nav-link" href="/categories">Categories</a>
+                
+                    <a class="main-nav-link" href="/tags">Tags</a>
+                
+                    <a class="main-nav-link" href="/proj">Projects</a>
+                
+                    <a class="main-nav-link" href="/book">Books</a>
+                
+                    <a class="main-nav-link" href="/about">About</a>
+                
+            </nav>
+            
+                
+                <nav id="sub-nav">
+                    <div class="profile" id="profile-nav">
+                        <a id="profile-anchor" href="javascript:;">
+                            <img class="avatar" src="/css/images/image_y.png" />
+                            <i class="fas fa-caret-down"></i>
+                        </a>
+                    </div>
+                </nav>
+            
+            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+        <button type="submit" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" placeholder="Type something..." />
+            <span class="ins-close ins-selectable"><i class="fas fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script>
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: 'Posts',
+            PAGES: 'Pages',
+            CATEGORIES: 'Categories',
+            TAGS: 'Tags',
+            UNTITLED: '(Untitled)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+<script src="/js/insight.js"></script>
+
+</div>
+        </div>
+    </div>
+    <div id="main-nav-mobile" class="header-sub header-inner">
+        <table class="menu outer">
+            <tr>
+                
+                    <td><a class="main-nav-link" href="/.">Home</a></td>
+                
+                    <td><a class="main-nav-link" href="/archives">Archives</a></td>
+                
+                    <td><a class="main-nav-link" href="/categories">Categories</a></td>
+                
+                    <td><a class="main-nav-link" href="/tags">Tags</a></td>
+                
+                    <td><a class="main-nav-link" href="/proj">Projects</a></td>
+                
+                    <td><a class="main-nav-link" href="/book">Books</a></td>
+                
+                    <td><a class="main-nav-link" href="/about">About</a></td>
+                
+                <td>
+                    
+    <div class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+    </div>
+
+                </td>
+            </tr>
+        </table>
+    </div>
+</header>
+
+        <div class="outer">
+            
+                
+
+<aside id="profile" class="profile-fixed">
+    <div class="inner profile-inner">
+        <div class="base-info profile-block">
+            <img id="avatar" src="/css/images/image_y.png" />
+            <h2 id="name">Roy Luo</h2>
+            <h3 id="title">Designer &amp; Developer</h3>
+            <span id="location"><i class="fas fa-map-marker-alt" style="padding-right: 5px"></i>Beijing, China</span>
+            <a id="follow" target="_blank" href="https://github.com/royhunter/">FOLLOW</a>
+        </div>
+        <div class="article-info profile-block">
+            <div class="article-info-block">
+                43
+                <span>posts</span>
+            </div>
+            <div class="article-info-block">
+                15
+                <span>tags</span>
+            </div>
+        </div>
+        
+        <div class="profile-block social-links">
+            <table>
+                <tr>
+                    
+                    
+                    <td>
+                        <a href="http://github.com/royhunter/" target="_blank" title="github" class=tooltip>
+                            <i class="fab fa-github"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://twitter.com/RoyLuoye" target="_blank" title="twitter" class=tooltip>
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://www.facebook/roy.luo.3367" target="_blank" title="facebook" class=tooltip>
+                            <i class="fab fa-facebook"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://cn.linkedin.com/in/royluoye" target="_blank" title="linkedin" class=tooltip>
+                            <i class="fab fa-linkedin"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="/atom.xml" target="_blank" title="rss" class=tooltip>
+                            <i class="fab fa-rss"></i>
+                        </a>
+                    </td>
+                    
+                </tr>
+            </table>
+        </div>
+        
+    </div>
+</aside>
+
+            
+            <section id="main"><article id="post-trampolines-for-nested-functions" class="article article-type-post" itemscope itemprop="blogPost">
+    <div class="article-inner">
+        
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+            Trampolines for Nested Functions in GCC
+        </h1>
+    
+
+                
+                    <div class="article-meta">
+                        
+    <div class="article-date">
+        <i class="fas fa-calendar-alt"></i>
+        <a href="/2016/08/28/trampolines-for-nested-functions/">
+            <time datetime="2016-08-28T13:26:32.000Z" itemprop="datePublished">2016-08-28</time>
+        </a>
+    </div>
+
+
+                        
+    <div class="article-category">
+    	<i class="fas fa-folder"></i>
+        <a class="article-category-link" href="/categories/Programme/">Programme</a>
+    </div>
+
+                        
+    <div class="article-tag">
+        <i class="fas fa-tag"></i>
+        <a class="tag-link" href="/tags/Tools/">Tools</a>
+    </div>
+
+                    </div>
+                
+            </header>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+        
+            
+            <p>C语言中关于内嵌函数的一些有意思的东西。<br><a id="more"></a></p>
+<h2 id="遇到的问题"><a href="#遇到的问题" class="headerlink" title="遇到的问题"></a>遇到的问题</h2><p>在工作中遇到一段代码crash了，代码大体如下（省去和公司有关的信息）：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">int c(int(*d)(int), int z)</span><br><span class="line">&#123;</span><br><span class="line">    d();</span><br><span class="line">    ......</span><br><span class="line">&#125;</span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">a</span><span class="params">(<span class="keyword">int</span> x)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">int</span> <span class="title">b</span><span class="params">(<span class="keyword">int</span> y)</span></span></span><br><span class="line"><span class="function">    </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> x + y;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    c(b, other_arg);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>大意大概是a函数中定义了b函数，b函数是内嵌定义的，而a调用c函数的时候将b函数作为参数传入，直观上看b函数地址是a函数的栈地址空间，c中调用b即是跳转至a的栈中进行执行；而程序却在此部位发生指令异常错误，由于我们用的是mips体系架构的vendor spec gcc，所以第一直觉是认为该mips-gcc并没有正确的对改种函数写法正确的编译；</p>
+<p>查阅了相关gcc的手册，确实有对这种内嵌函数的编译进行具体说明的。</p>
+<h2 id="Trampolines-for-Nested-Functions"><a href="#Trampolines-for-Nested-Functions" class="headerlink" title="Trampolines for Nested Functions"></a>Trampolines for Nested Functions</h2><p>在gcc手册中针对这种Nested Functions使用了Trampoline技术：<br><a href="https://gcc.gnu.org/onlinedocs/gccint/Trampolines.html" target="_blank" rel="noopener">https://gcc.gnu.org/onlinedocs/gccint/Trampolines.html</a></p>
+<blockquote>
+<p>A trampoline is <strong>a small piece of code</strong> that is <strong>created at run time</strong> when the address of a nested function is taken. It normally <strong>resides on the stack</strong>, in the stack frame of the containing function. These macros tell GCC how to generate code to allocate and initialize a trampoline.<br>The instructions in the trampoline must <strong>do two things: load a constant address into the static chain register, and jump to the real address of the nested function</strong>. On CISC machines such as the m68k, this requires two instructions, a move immediate and a jump. Then the two addresses exist in the trampoline as word-long immediate operands. On RISC machines, it is often necessary to load each address into a register in two parts. Then pieces of each address form separate immediate operands.</p>
+</blockquote>
+<p>具体的含义我们在x86的系统中进行了一些实验来进行验证。</p>
+<h2 id="例1"><a href="#例1" class="headerlink" title="例1"></a>例1</h2><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">test1.c</span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">a</span><span class="params">(<span class="keyword">int</span> x)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">int</span> <span class="title">b</span><span class="params">(<span class="keyword">int</span> y)</span></span></span><br><span class="line"><span class="function">    </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> x + y;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> b(x);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"%d\n"</span>, a(<span class="number">10</span>));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$gcc</span> -o test1 test1.c</span><br><span class="line"><span class="variable">$objdump</span> -d test1</span><br></pre></td></tr></table></figure>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">000000000040052</span>d &lt;b<span class="number">.2180</span>&gt;:</span><br><span class="line">  <span class="number">40052</span>d:       <span class="number">55</span>                      push   %rbp</span><br><span class="line">  <span class="number">40052</span>e:       <span class="number">48</span> <span class="number">89</span> e5                mov    %rsp,%rbp</span><br><span class="line">  <span class="number">400531</span>:       <span class="number">89</span> <span class="number">7</span>d fc                mov    %edi,<span class="number">-0x4</span>(%rbp)</span><br><span class="line">  <span class="number">400534</span>:       <span class="number">4</span>c <span class="number">89</span> d0                mov    %r10,%rax</span><br><span class="line">  <span class="number">400537</span>:       <span class="number">8b</span> <span class="number">10</span>                   mov    (%rax),%edx</span><br><span class="line">  <span class="number">400539</span>:       <span class="number">8b</span> <span class="number">45</span> fc                mov    <span class="number">-0x4</span>(%rbp),%eax</span><br><span class="line">  <span class="number">40053</span>c:       <span class="number">01</span> d0                   add    %edx,%eax</span><br><span class="line">  <span class="number">40053</span>e:       <span class="number">5</span>d                      pop    %rbp</span><br><span class="line">  <span class="number">40053f</span>:       c3                      retq   </span><br><span class="line"></span><br><span class="line"><span class="number">0000000000400540</span> &lt;a&gt;:</span><br><span class="line">  <span class="number">400540</span>:       <span class="number">55</span>                      push   %rbp</span><br><span class="line">  <span class="number">400541</span>:       <span class="number">48</span> <span class="number">89</span> e5                mov    %rsp,%rbp</span><br><span class="line">  <span class="number">400544</span>:       <span class="number">48</span> <span class="number">83</span> ec <span class="number">10</span>             sub    $<span class="number">0x10</span>,%rsp</span><br><span class="line">  <span class="number">400548</span>:       <span class="number">89</span> f8                   mov    %edi,%eax</span><br><span class="line">  <span class="number">40054</span>a:       <span class="number">89</span> <span class="number">45</span> f0                mov    %eax,<span class="number">-0x10</span>(%rbp)</span><br><span class="line">  <span class="number">40054</span>d:       <span class="number">8b</span> <span class="number">45</span> f0                mov    <span class="number">-0x10</span>(%rbp),%eax</span><br><span class="line">  <span class="number">400550</span>:       <span class="number">48</span> <span class="number">8</span>d <span class="number">55</span> f0             lea    <span class="number">-0x10</span>(%rbp),%rdx</span><br><span class="line">  <span class="number">400554</span>:       <span class="number">49</span> <span class="number">89</span> d2                mov    %rdx,%r10</span><br><span class="line">  <span class="number">400557</span>:       <span class="number">89</span> c7                   mov    %eax,%edi</span><br><span class="line">  <span class="number">400559</span>:       e8 cf ff ff ff          callq  <span class="number">40052</span>d &lt;b<span class="number">.2180</span>&gt;   &lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;调用内嵌函数</span><br><span class="line">  <span class="number">40055</span>e:       c9                      leaveq </span><br><span class="line">  <span class="number">40055f</span>:       c3                      retq   </span><br><span class="line"></span><br><span class="line"><span class="number">0000000000400560</span> &lt;main&gt;:</span><br><span class="line">  <span class="number">400560</span>:       <span class="number">55</span>                      push   %rbp</span><br><span class="line">  <span class="number">400561</span>:       <span class="number">48</span> <span class="number">89</span> e5                mov    %rsp,%rbp</span><br><span class="line">  <span class="number">400564</span>:       bf <span class="number">0</span>a <span class="number">00</span> <span class="number">00</span> <span class="number">00</span>          mov    $<span class="number">0xa</span>,%edi</span><br><span class="line">  <span class="number">400569</span>:       e8 d2 ff ff ff          callq  <span class="number">400540</span> &lt;a&gt;</span><br><span class="line">  <span class="number">40056</span>e:       <span class="number">89</span> c6                   mov    %eax,%esi</span><br><span class="line">  <span class="number">400570</span>:       bf <span class="number">14</span> <span class="number">06</span> <span class="number">40</span> <span class="number">00</span>          mov    $<span class="number">0x400614</span>,%edi</span><br><span class="line">  <span class="number">400575</span>:       b8 <span class="number">00</span> <span class="number">00</span> <span class="number">00</span> <span class="number">00</span>          mov    $<span class="number">0x0</span>,%eax</span><br><span class="line">  <span class="number">40057</span>a:       e8 <span class="number">91</span> fe ff ff          callq  <span class="number">400410</span> &lt;<span class="built_in">printf</span>@plt&gt;</span><br><span class="line">  <span class="number">40057f</span>:       <span class="number">5</span>d                      pop    %rbp</span><br><span class="line">  <span class="number">400580</span>:       c3                      retq   </span><br><span class="line">  <span class="number">400581</span>:       <span class="number">66</span> <span class="number">2</span>e <span class="number">0f</span> <span class="number">1f</span> <span class="number">84</span> <span class="number">00</span> <span class="number">00</span>    nopw   %cs:<span class="number">0x0</span>(%rax,%rax,<span class="number">1</span>)</span><br><span class="line">  <span class="number">400588</span>:       <span class="number">00</span> <span class="number">00</span> <span class="number">00</span> </span><br><span class="line">  <span class="number">40058b</span>:       <span class="number">0f</span> <span class="number">1f</span> <span class="number">44</span> <span class="number">00</span> <span class="number">00</span>          nopl   <span class="number">0x0</span>(%rax,%rax,<span class="number">1</span>)</span><br></pre></td></tr></table></figure>
+<p>在这个例子中可以看到编译出来的代码运行时中规中矩，a调用b的时候只是常规的跳转，只是b的函数名变化了一下，和普通函数并没有什么不同，而且b的函数体也是在代码段中的，与a的栈空间没有任何瓜葛。</p>
+<h2 id="例2"><a href="#例2" class="headerlink" title="例2"></a>例2</h2><p>在例子1的基础上做一些修改：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">test2.c</span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">aa</span><span class="params">(<span class="keyword">int</span> x)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">int</span> <span class="title">bb</span><span class="params">(<span class="keyword">int</span> y)</span></span></span><br><span class="line"><span class="function">    </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> x + y;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">int</span> (*c)(<span class="keyword">int</span> z) = bb;    <span class="comment">//将内嵌函数进行赋值，同时打印内嵌函数的地址</span></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"c's addr is %p\n"</span>, c);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> c(x);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"%d\n"</span>, aa(<span class="number">10</span>));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>运行结果：<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">c<span class="string">'s addr is 0x7fff049e8d94</span></span><br><span class="line"><span class="string">20</span></span><br></pre></td></tr></table></figure></p>
+<p>从下面test2的pmap空间可以看到，c的地址落于栈中，且栈也具有可执行属性。<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">3949</span>:   ./test2</span><br><span class="line"><span class="number">0000000000400000</span>      <span class="number">4</span>K r-x-- x1</span><br><span class="line"><span class="number">0000000000600000</span>      <span class="number">4</span>K r-x-- x1</span><br><span class="line"><span class="number">0000000000601000</span>      <span class="number">4</span>K rwx-- x1</span><br><span class="line"><span class="number">00007f</span>fff7a14000   <span class="number">1776</span>K r-x-- libc<span class="number">-2.19</span>.so</span><br><span class="line"><span class="number">00007f</span>fff7bd0000   <span class="number">2044</span>K ----- libc<span class="number">-2.19</span>.so</span><br><span class="line"><span class="number">00007f</span>fff7dcf000     <span class="number">16</span>K r-x-- libc<span class="number">-2.19</span>.so</span><br><span class="line"><span class="number">00007f</span>fff7dd3000      <span class="number">8</span>K rwx-- libc<span class="number">-2.19</span>.so</span><br><span class="line"><span class="number">00007f</span>fff7dd5000     <span class="number">20</span>K rwx--   [ anon ]</span><br><span class="line"><span class="number">00007f</span>fff7dda000    <span class="number">140</span>K r-x-- ld<span class="number">-2.19</span>.so</span><br><span class="line"><span class="number">00007f</span>fff7fe0000     <span class="number">12</span>K rwx--   [ anon ]</span><br><span class="line"><span class="number">00007f</span>fff7ff7000     <span class="number">12</span>K rwx--   [ anon ]</span><br><span class="line"><span class="number">00007f</span>fff7ffa000      <span class="number">8</span>K r-x--   [ anon ]</span><br><span class="line"><span class="number">00007f</span>fff7ffc000      <span class="number">4</span>K r-x-- ld<span class="number">-2.19</span>.so</span><br><span class="line"><span class="number">00007f</span>fff7ffd000      <span class="number">4</span>K rwx-- ld<span class="number">-2.19</span>.so</span><br><span class="line"><span class="number">00007f</span>fff7ffe000      <span class="number">4</span>K rwx--   [ anon ]</span><br><span class="line"><span class="number">00007f</span>fffffde000    <span class="number">132</span>K rwx--   [ <span class="built_in">stack</span> ]     &lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</span><br><span class="line">ffffffffff600000      <span class="number">4</span>K r-x--   [ anon ]</span><br><span class="line"> total             <span class="number">4196</span>K</span><br></pre></td></tr></table></figure></p>
+<p>而这种写法下面的内嵌汇编也复杂了一些：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">00000000004005</span>ed &lt;bb<span class="number">.2180</span>&gt;:</span><br><span class="line">  <span class="number">4005</span>ed:       <span class="number">55</span>                      push   %rbp</span><br><span class="line">  <span class="number">4005</span>ee:       <span class="number">48</span> <span class="number">89</span> e5                mov    %rsp,%rbp</span><br><span class="line">  <span class="number">4005f</span>1:       <span class="number">89</span> <span class="number">7</span>d fc                mov    %edi,<span class="number">-0x4</span>(%rbp)</span><br><span class="line">  <span class="number">4005f</span>4:       <span class="number">4</span>c <span class="number">89</span> d0                mov    %r10,%rax</span><br><span class="line">  <span class="number">4005f</span>7:       <span class="number">8b</span> <span class="number">10</span>                   mov    (%rax),%edx</span><br><span class="line">  <span class="number">4005f</span>9:       <span class="number">8b</span> <span class="number">45</span> fc                mov    <span class="number">-0x4</span>(%rbp),%eax</span><br><span class="line">  <span class="number">4005f</span>c:       <span class="number">01</span> d0                   add    %edx,%eax</span><br><span class="line">  <span class="number">4005f</span>e:       <span class="number">5</span>d                      pop    %rbp</span><br><span class="line">  <span class="number">4005f</span>f:       c3                      retq   </span><br><span class="line"></span><br><span class="line"><span class="number">0000000000400600</span> &lt;aa&gt;:</span><br><span class="line">  <span class="number">400600</span>:       <span class="number">55</span>                      push   %rbp</span><br><span class="line">  <span class="number">400601</span>:       <span class="number">48</span> <span class="number">89</span> e5                mov    %rsp,%rbp</span><br><span class="line">  <span class="number">400604</span>:       <span class="number">53</span>                      push   %rbx</span><br><span class="line">  <span class="number">400605</span>:       <span class="number">48</span> <span class="number">83</span> ec <span class="number">48</span>             sub    $<span class="number">0x48</span>,%rsp</span><br><span class="line">  <span class="number">400609</span>:       <span class="number">89</span> f8                   mov    %edi,%eax</span><br><span class="line">  <span class="number">40060b</span>:       <span class="number">64</span> <span class="number">48</span> <span class="number">8b</span> <span class="number">1</span>c <span class="number">25</span> <span class="number">28</span> <span class="number">00</span>    mov    %fs:<span class="number">0x28</span>,%rbx</span><br><span class="line">  <span class="number">400612</span>:       <span class="number">00</span> <span class="number">00</span> </span><br><span class="line">  <span class="number">400614</span>:       <span class="number">48</span> <span class="number">89</span> <span class="number">5</span>d e8             mov    %rbx,<span class="number">-0x18</span>(%rbp)</span><br><span class="line">  <span class="number">400618</span>:       <span class="number">31</span> db                   xor    %ebx,%ebx</span><br><span class="line">  <span class="number">40061</span>a:       <span class="number">89</span> <span class="number">45</span> c0                mov    %eax,<span class="number">-0x40</span>(%rbp)</span><br><span class="line">  <span class="number">40061</span>d:       <span class="number">48</span> <span class="number">8</span>d <span class="number">45</span> c0             lea    <span class="number">-0x40</span>(%rbp),%rax</span><br><span class="line">  <span class="number">400621</span>:       <span class="number">48</span> <span class="number">83</span> c0 <span class="number">04</span>             add    $<span class="number">0x4</span>,%rax</span><br><span class="line">  <span class="number">400625</span>:       <span class="number">48</span> <span class="number">8</span>d <span class="number">55</span> c0             lea    <span class="number">-0x40</span>(%rbp),%rdx</span><br><span class="line">  <span class="number">400629</span>:       b9 ed <span class="number">05</span> <span class="number">40</span> <span class="number">00</span>          mov    $<span class="number">0x4005ed</span>,%ecx</span><br><span class="line">  <span class="number">40062</span>e:       <span class="number">66</span> c7 <span class="number">00</span> <span class="number">41</span> bb          movw   $<span class="number">0xbb41</span>,(%rax)</span><br><span class="line">  <span class="number">400633</span>:       <span class="number">89</span> <span class="number">48</span> <span class="number">02</span>                mov    %ecx,<span class="number">0x2</span>(%rax)</span><br><span class="line">  <span class="number">400636</span>:       <span class="number">66</span> c7 <span class="number">40</span> <span class="number">06</span> <span class="number">49</span> ba       movw   $<span class="number">0xba49</span>,<span class="number">0x6</span>(%rax)         &lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</span><br><span class="line">  <span class="number">40063</span>c:       <span class="number">48</span> <span class="number">89</span> <span class="number">50</span> <span class="number">08</span>             mov    %rdx,<span class="number">0x8</span>(%rax)            &lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</span><br><span class="line">  <span class="number">400640</span>:       c7 <span class="number">40</span> <span class="number">10</span> <span class="number">49</span> ff e3 <span class="number">90</span>    movl   $<span class="number">0x90e3ff49</span>,<span class="number">0x10</span>(%rax)    &lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</span><br><span class="line">  <span class="number">400647</span>:       <span class="number">48</span> <span class="number">8</span>d <span class="number">45</span> c0             lea    <span class="number">-0x40</span>(%rbp),%rax</span><br><span class="line">  <span class="number">40064b</span>:       <span class="number">48</span> <span class="number">83</span> c0 <span class="number">04</span>             add    $<span class="number">0x4</span>,%rax</span><br><span class="line">  <span class="number">40064f</span>:       <span class="number">48</span> <span class="number">89</span> <span class="number">45</span> b8             mov    %rax,<span class="number">-0x48</span>(%rbp)</span><br><span class="line">  <span class="number">400653</span>:       <span class="number">48</span> <span class="number">8b</span> <span class="number">45</span> b8             mov    <span class="number">-0x48</span>(%rbp),%rax</span><br><span class="line">  <span class="number">400657</span>:       <span class="number">48</span> <span class="number">89</span> c6                mov    %rax,%rsi</span><br><span class="line">  <span class="number">40065</span>a:       bf <span class="number">44</span> <span class="number">07</span> <span class="number">40</span> <span class="number">00</span>          mov    $<span class="number">0x400744</span>,%edi</span><br><span class="line">  <span class="number">40065f</span>:       b8 <span class="number">00</span> <span class="number">00</span> <span class="number">00</span> <span class="number">00</span>          mov    $<span class="number">0x0</span>,%eax</span><br><span class="line">  <span class="number">400664</span>:       e8 <span class="number">57</span> fe ff ff          callq  <span class="number">4004</span>c0 &lt;<span class="built_in">printf</span>@plt&gt;</span><br><span class="line">  <span class="number">400669</span>:       <span class="number">8b</span> <span class="number">55</span> c0                mov    <span class="number">-0x40</span>(%rbp),%edx</span><br><span class="line">  <span class="number">40066</span>c:       <span class="number">48</span> <span class="number">8b</span> <span class="number">45</span> b8             mov    <span class="number">-0x48</span>(%rbp),%rax</span><br><span class="line">  <span class="number">400670</span>:       <span class="number">89</span> d7                   mov    %edx,%edi</span><br><span class="line">  <span class="number">400672</span>:       ff d0                   callq  *%rax                   &lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</span><br><span class="line">  <span class="number">400674</span>:       <span class="number">48</span> <span class="number">8b</span> <span class="number">75</span> e8             mov    <span class="number">-0x18</span>(%rbp),%rsi</span><br><span class="line">  <span class="number">400678</span>:       <span class="number">64</span> <span class="number">48</span> <span class="number">33</span> <span class="number">34</span> <span class="number">25</span> <span class="number">28</span> <span class="number">00</span>    xor    %fs:<span class="number">0x28</span>,%rsi</span><br><span class="line">  <span class="number">40067f</span>:       <span class="number">00</span> <span class="number">00</span> </span><br><span class="line">  <span class="number">400681</span>:       <span class="number">74</span> <span class="number">05</span>                   je     <span class="number">400688</span> &lt;aa+<span class="number">0x88</span>&gt;</span><br><span class="line">  <span class="number">400683</span>:       e8 <span class="number">28</span> fe ff ff          callq  <span class="number">4004b</span>0 &lt;__stack_chk_fail@plt&gt;</span><br><span class="line">  <span class="number">400688</span>:       <span class="number">48</span> <span class="number">83</span> c4 <span class="number">48</span>             add    $<span class="number">0x48</span>,%rsp</span><br><span class="line">  <span class="number">40068</span>c:       <span class="number">5b</span>                      pop    %rbx</span><br><span class="line">  <span class="number">40068</span>d:       <span class="number">5</span>d                      pop    %rbp</span><br><span class="line">  <span class="number">40068</span>e:       c3                      retq   </span><br><span class="line"></span><br><span class="line"><span class="number">000000000040068f</span> &lt;main&gt;:</span><br><span class="line">  <span class="number">40068f</span>:       <span class="number">55</span>                      push   %rbp</span><br><span class="line">  <span class="number">400690</span>:       <span class="number">48</span> <span class="number">89</span> e5                mov    %rsp,%rbp</span><br><span class="line">  <span class="number">400693</span>:       bf <span class="number">0</span>a <span class="number">00</span> <span class="number">00</span> <span class="number">00</span>          mov    $<span class="number">0xa</span>,%edi</span><br><span class="line">  <span class="number">400698</span>:       e8 <span class="number">63</span> ff ff ff          callq  <span class="number">400600</span> &lt;aa&gt;</span><br><span class="line">  <span class="number">40069</span>d:       <span class="number">89</span> c6                   mov    %eax,%esi</span><br><span class="line">  <span class="number">40069f</span>:       bf <span class="number">54</span> <span class="number">07</span> <span class="number">40</span> <span class="number">00</span>          mov    $<span class="number">0x400754</span>,%edi</span><br><span class="line">  <span class="number">4006</span>a4:       b8 <span class="number">00</span> <span class="number">00</span> <span class="number">00</span> <span class="number">00</span>          mov    $<span class="number">0x0</span>,%eax</span><br><span class="line">  <span class="number">4006</span>a9:       e8 <span class="number">12</span> fe ff ff          callq  <span class="number">4004</span>c0 &lt;<span class="built_in">printf</span>@plt&gt;</span><br><span class="line">  <span class="number">4006</span>ae:       bf a0 <span class="number">86</span> <span class="number">01</span> <span class="number">00</span>          mov    $<span class="number">0x186a0</span>,%edi</span><br><span class="line">  <span class="number">4006b</span>3:       b8 <span class="number">00</span> <span class="number">00</span> <span class="number">00</span> <span class="number">00</span>          mov    $<span class="number">0x0</span>,%eax</span><br><span class="line">  <span class="number">4006b</span>8:       e8 <span class="number">33</span> fe ff ff          callq  <span class="number">4004f</span>0 &lt;sleep@plt&gt;</span><br><span class="line">  <span class="number">4006b</span>d:       <span class="number">5</span>d                      pop    %rbp</span><br><span class="line">  <span class="number">4006b</span>e:       c3                      retq   </span><br><span class="line">  <span class="number">4006b</span>f:       <span class="number">90</span>                      nop</span><br></pre></td></tr></table></figure></p>
+<p>和例子1不同，aa函数中并没有显式调用bb函数的地方，而0x400672处有点像跳转的意思，我们在此设置断点：<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$b</span> *0x400672</span><br><span class="line"><span class="variable">$run</span></span><br><span class="line">Breakpoint 1, 0x0000000000400672 <span class="keyword">in</span> aa ()</span><br><span class="line">(gdb) info registers </span><br><span class="line">rax            0x7fffffffe3d4   140737488348116   &lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</span><br><span class="line">rbx            0x0      0</span><br><span class="line">rcx            0x1a     26</span><br><span class="line">rdx            0xa      10</span><br><span class="line">rsi            0x7fffffe5       2147483621</span><br></pre></td></tr></table></figure></p>
+<p>此时rax为0x7fffffffe3d4，显然该地址为栈地址，既然为跳转指令，我们可以看看这其中是在干什么：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">(gdb) disassemble <span class="number">0x7fffffffe3d4</span>+<span class="number">0x0</span>, <span class="number">0x7fffffffe3d4</span>+<span class="number">0x20</span></span><br><span class="line">Dump of assembler code from <span class="number">0x7fffffffe3d4</span> to <span class="number">0x7fffffffe3f4</span>:</span><br><span class="line">   <span class="number">0x00007fffffffe3d4</span>:  mov    $<span class="number">0x4005ed</span>,%r11d               &lt;&lt;&lt;&lt;&lt;&lt;</span><br><span class="line">   <span class="number">0x00007fffffffe3da</span>:  movabs $<span class="number">0x7fffffffe3d0</span>,%r10          &lt;&lt;&lt;&lt;&lt;&lt;</span><br><span class="line">   <span class="number">0x00007fffffffe3e4</span>:  rex.WB jmpq *%r11                    &lt;&lt;&lt;&lt;&lt;&lt;</span><br><span class="line">   <span class="number">0x00007fffffffe3e7</span>:  nop</span><br><span class="line">   <span class="number">0x00007fffffffe3e8</span>:  <span class="keyword">or</span>     $<span class="number">0x4007</span>,%eax</span><br><span class="line">   <span class="number">0x00007fffffffe3ed</span>:  add    %al,(%rax)</span><br><span class="line">   <span class="number">0x00007fffffffe3ef</span>:  add    %ah,(%rax)</span><br><span class="line">   <span class="number">0x00007fffffffe3f1</span>:  in     $<span class="number">0xff</span>,%al</span><br><span class="line">   <span class="number">0x00007fffffffe3f3</span>:  (bad)  </span><br><span class="line">End of assembler dump.</span><br></pre></td></tr></table></figure></p>
+<ol>
+<li>加载$0x4005ed到r11</li>
+<li>加载$0x7fffffffe3d0到r10</li>
+<li>跳转至r11</li>
+</ol>
+<p>$0x4005ed就是bb函数的地址（00000000004005ed &lt;bb.2180&gt; ），$0x7fffffffe3d0应该是传入的参数<br>而aa中的这几段汇编就是在制造Trampoline：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">400636</span>:       <span class="number">66</span> c7 <span class="number">40</span> <span class="number">06</span> <span class="number">49</span> ba       movw   $<span class="number">0xba49</span>,<span class="number">0x6</span>(%rax)         &lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</span><br><span class="line"><span class="number">40063</span>c:       <span class="number">48</span> <span class="number">89</span> <span class="number">50</span> <span class="number">08</span>             mov    %rdx,<span class="number">0x8</span>(%rax)            &lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</span><br><span class="line"><span class="number">400640</span>:       c7 <span class="number">40</span> <span class="number">10</span> <span class="number">49</span> ff e3 <span class="number">90</span>    movl   $<span class="number">0x90e3ff49</span>,<span class="number">0x10</span>(%rax)    &lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</span><br></pre></td></tr></table></figure></p>
+<p>很显然在x86的机器上该写法能够成功编译，并使用trampoline技术，运行正确，而vendor spec mips-gcc由于功能限制无法正确编译，包括一些嵌入式ARM体系结构的gcc（本人实测过）也不能支持此种内嵌函数的写法，所以解决方法就是走常规路子，将内嵌函数搬到外面来。</p>
+<h2 id="题外"><a href="#题外" class="headerlink" title="题外"></a>题外</h2><p>Trampoline有什么好处呢，其最大的作用可以实现高级语言中支持的闭包，比如Python：<br><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">make_adder</span><span class="params">(addend)</span>:</span></span><br><span class="line">    <span class="function"><span class="keyword">def</span> <span class="title">adder</span><span class="params">(augend)</span>:</span></span><br><span class="line">        <span class="keyword">return</span> augend + addend</span><br><span class="line">    <span class="keyword">return</span> adder</span><br></pre></td></tr></table></figure></p>
+
+        
+        </div>
+        <footer class="article-footer">
+            <div class="share-container">
+
+
+
+</div>
+
+    <a data-url="http://royhunter.github.io/2016/08/28/trampolines-for-nested-functions/" data-id="ck2oe6fqg003txkkv1p5dsie8" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+<script>
+    (function ($) {
+        // Prevent duplicate binding
+        if (typeof(__SHARE_BUTTON_BINDED__) === 'undefined' || !__SHARE_BUTTON_BINDED__) {
+            __SHARE_BUTTON_BINDED__ = true;
+        } else {
+            return;
+        }
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url'),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="fab fa-twitter article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="fab fa-facebook article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="fab fa-pinterest article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                            '<a href="https://plus.google.com/share?url=' + encodedUrl + '" class="fab fa-google article-share-google" target="_blank" title="Google+"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+            
+    
+
+        </footer>
+    </div>
+    
+        
+<nav id="article-nav">
+    
+        <a href="/2017/04/18/ovs01/" id="article-nav-newer" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Newer</strong>
+            <div class="article-nav-title">
+                
+                    OVS01-OVS基础-安装、配置、Simple Case
+                
+            </div>
+        </a>
+    
+    
+        <a href="/2016/08/26/host-patch/" id="article-nav-older" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Older</strong>
+            <div class="article-nav-title">Linker for hotpatch</div>
+        </a>
+    
+</nav>
+
+
+    
+</article>
+
+
+    
+    
+
+</section>
+            
+                
+<aside id="sidebar">
+   
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">recent</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2020/07/12/index/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"></p>
+                            <p class="item-title"><a href="/2020/07/12/index/" class="title">Blog索引</a></p>
+                            <p class="item-date"><time datetime="2020-07-12T13:33:28.000Z" itemprop="datePublished">2020-07-12</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/07/17/ovs02-vxlan/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/07/17/ovs02-vxlan/" class="title">OVS02-VXLAN内核相关实现</a></p>
+                            <p class="item-date"><time datetime="2018-07-17T12:15:34.000Z" itemprop="datePublished">2018-07-17</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/01/10/perf-tunning/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/01/10/perf-tunning/" class="title">datapath性能优化总结</a></p>
+                            <p class="item-date"><time datetime="2018-01-10T13:26:32.000Z" itemprop="datePublished">2018-01-10</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2017/04/18/ovs01/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2017/04/18/ovs01/" class="title">OVS01-OVS基础-安装、配置、Simple Case</a></p>
+                            <p class="item-date"><time datetime="2017-04-18T13:26:32.000Z" itemprop="datePublished">2017-04-18</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2016/08/28/trampolines-for-nested-functions/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Programme/">Programme</a></p>
+                            <p class="item-title"><a href="/2016/08/28/trampolines-for-nested-functions/" class="title">Trampolines for Nested Functions in GCC</a></p>
+                            <p class="item-date"><time datetime="2016-08-28T13:26:32.000Z" itemprop="datePublished">2016-08-28</time></p>
+                        </div>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">categories</h3>
+        <div class="widget">
+            <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Algorithm/">Algorithm</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Container/">Container</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Docker/">Docker</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Hyper-V/">Hyper-V</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/KVM/">KVM</a><span class="category-list-count">22</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Misc/">Misc</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/PROGRAMME/">PROGRAMME</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Programme/">Programme</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Virtualization/">Virtualization</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/go/">go</a><span class="category-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">archives</h3>
+        <div class="widget">
+            <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">July 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">July 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">January 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">April 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">August 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/06/">June 2016</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/05/">May 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/03/">March 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/02/">February 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/01/">January 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/12/">December 2015</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/11/">November 2015</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/08/">August 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/07/">July 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/06/">June 2014</a><span class="archive-list-count">5</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tags</h3>
+        <div class="widget">
+            <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Container/">Container</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Distribute/">Distribute</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/EPT/">EPT</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux-namespace/">Linux namespace</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Network/">Network</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/PROGRAMME/">PROGRAMME</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Programme-Language/">Programme Language</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/QEMU/">QEMU</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Tools/">Tools</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization/">Virtualization</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization-KVM-QEMU/">Virtualization KVM QEMU</a><span class="tag-list-count">9</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/libvirt/">libvirt</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vhost/">vhost</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/virtio/">virtio</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vps-proxy/">vps_proxy</a><span class="tag-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tag cloud</h3>
+        <div class="widget tagcloud">
+            <a href="/tags/Container/" style="font-size: 12.5px;">Container</a> <a href="/tags/Distribute/" style="font-size: 12.5px;">Distribute</a> <a href="/tags/EPT/" style="font-size: 12.5px;">EPT</a> <a href="/tags/Linux-namespace/" style="font-size: 12.5px;">Linux namespace</a> <a href="/tags/Network/" style="font-size: 15px;">Network</a> <a href="/tags/PROGRAMME/" style="font-size: 10px;">PROGRAMME</a> <a href="/tags/Programme-Language/" style="font-size: 10px;">Programme Language</a> <a href="/tags/QEMU/" style="font-size: 12.5px;">QEMU</a> <a href="/tags/Tools/" style="font-size: 12.5px;">Tools</a> <a href="/tags/Virtualization/" style="font-size: 17.5px;">Virtualization</a> <a href="/tags/Virtualization-KVM-QEMU/" style="font-size: 20px;">Virtualization KVM QEMU</a> <a href="/tags/libvirt/" style="font-size: 10px;">libvirt</a> <a href="/tags/vhost/" style="font-size: 10px;">vhost</a> <a href="/tags/virtio/" style="font-size: 17.5px;">virtio</a> <a href="/tags/vps-proxy/" style="font-size: 10px;">vps_proxy</a>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">links</h3>
+        <div class="widget">
+            <ul>
+                
+                    <li>
+                        <a href="http://hexo.io">Hexo</a>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+
+    
+    <div id="toTop" class="fas fa-angle-up"></div>
+</aside>
+
+            
+        </div>
+        <footer id="footer">
+    <div class="outer">
+        <div id="footer-info" class="inner">
+            &copy; 2019 John Doe<br>
+            Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>. Theme by <a href="http://github.com/ppoffice">PPOffice</a>
+        </div>
+    </div>
+</footer>
+        
+
+
+    
+        <script src="/libs/lightgallery/js/lightgallery.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-thumbnail.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-pager.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-autoplay.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-fullscreen.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-zoom.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-hash.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-share.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-video.min.js"></script>
+    
+    
+        <script src="/libs/justified-gallery/jquery.justifiedGallery.min.js"></script>
+    
+    
+
+
+
+<!-- Custom Scripts -->
+<script src="/js/main.js"></script>
+
+    </div>
+</body>
+</html>

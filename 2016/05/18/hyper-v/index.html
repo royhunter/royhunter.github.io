@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <meta charset="utf-8">
+    
+    <title>关于Hyper-V的一些理解 | RoyLuo&#39;s Notes</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="description" content="由于工作项目的关系，有机会学习和使用微软的虚拟化软件Hyper-V。由于Hyper-V是个纯商用的软件项目，不像开源的KVM有全部的代码和充足的文档可供阅读，所以目前也是根据官网的仅有的一些介绍性文档和网络资源、部分开源代码进行了学习，此处进行记录，若有不对之处，可以留言、邮件进行探讨。">
+<meta name="keywords" content="Virtualization">
+<meta property="og:type" content="article">
+<meta property="og:title" content="关于Hyper-V的一些理解">
+<meta property="og:url" content="http://royhunter.github.io/2016/05/18/hyper-v/index.html">
+<meta property="og:site_name" content="RoyLuo&#39;s Notes">
+<meta property="og:description" content="由于工作项目的关系，有机会学习和使用微软的虚拟化软件Hyper-V。由于Hyper-V是个纯商用的软件项目，不像开源的KVM有全部的代码和充足的文档可供阅读，所以目前也是根据官网的仅有的一些介绍性文档和网络资源、部分开源代码进行了学习，此处进行记录，若有不对之处，可以留言、邮件进行探讨。">
+<meta property="og:locale" content="en">
+<meta property="og:image" content="http://7j1zal.com1.z0.glb.clouddn.com/hypervisor.PNG">
+<meta property="og:image" content="http://7j1zal.com1.z0.glb.clouddn.com/hv_arch.PNG">
+<meta property="og:image" content="http://7j1zal.com1.z0.glb.clouddn.com/hv_driver.PNG">
+<meta property="og:image" content="http://7j1zal.com1.z0.glb.clouddn.com/code_1.PNG">
+<meta property="og:image" content="http://7j1zal.com1.z0.glb.clouddn.com/code_2.PNG">
+<meta property="og:image" content="http://7j1zal.com1.z0.glb.clouddn.com/code_3.PNG">
+<meta property="og:updated_time" content="2016-05-18T14:17:02.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="关于Hyper-V的一些理解">
+<meta name="twitter:description" content="由于工作项目的关系，有机会学习和使用微软的虚拟化软件Hyper-V。由于Hyper-V是个纯商用的软件项目，不像开源的KVM有全部的代码和充足的文档可供阅读，所以目前也是根据官网的仅有的一些介绍性文档和网络资源、部分开源代码进行了学习，此处进行记录，若有不对之处，可以留言、邮件进行探讨。">
+<meta name="twitter:image" content="http://7j1zal.com1.z0.glb.clouddn.com/hypervisor.PNG">
+    
+
+    
+        <link rel="alternate" href="atom.xml" title="RoyLuo&#39;s Notes" type="application/atom+xml" />
+    
+
+    
+
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fontawesome.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-brands.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-solid.min.css">
+    <link rel="stylesheet" href="/libs/open-sans/styles.css">
+    <link rel="stylesheet" href="/libs/source-code-pro/styles.css">
+
+    <link rel="stylesheet" href="/css/style.css">
+
+    <script src="/libs/jquery/2.1.3/jquery.min.js"></script>
+    
+    
+        <link rel="stylesheet" href="/libs/lightgallery/css/lightgallery.min.css">
+    
+    
+        <link rel="stylesheet" href="/libs/justified-gallery/justifiedGallery.min.css">
+    
+    
+    
+    
+
+
+</head>
+
+<body>
+    <div id="container">
+        <header id="header">
+    <div id="header-main" class="header-inner">
+        <div class="outer">
+            <a href="/" id="logo">
+                <i class="logo"></i>
+                <span class="site-title">RoyLuo&#39;s Notes</span>
+            </a>
+            <nav id="main-nav">
+                
+                    <a class="main-nav-link" href="/.">Home</a>
+                
+                    <a class="main-nav-link" href="/archives">Archives</a>
+                
+                    <a class="main-nav-link" href="/categories">Categories</a>
+                
+                    <a class="main-nav-link" href="/tags">Tags</a>
+                
+                    <a class="main-nav-link" href="/proj">Projects</a>
+                
+                    <a class="main-nav-link" href="/book">Books</a>
+                
+                    <a class="main-nav-link" href="/about">About</a>
+                
+            </nav>
+            
+                
+                <nav id="sub-nav">
+                    <div class="profile" id="profile-nav">
+                        <a id="profile-anchor" href="javascript:;">
+                            <img class="avatar" src="/css/images/image_y.png" />
+                            <i class="fas fa-caret-down"></i>
+                        </a>
+                    </div>
+                </nav>
+            
+            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+        <button type="submit" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" placeholder="Type something..." />
+            <span class="ins-close ins-selectable"><i class="fas fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script>
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: 'Posts',
+            PAGES: 'Pages',
+            CATEGORIES: 'Categories',
+            TAGS: 'Tags',
+            UNTITLED: '(Untitled)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+<script src="/js/insight.js"></script>
+
+</div>
+        </div>
+    </div>
+    <div id="main-nav-mobile" class="header-sub header-inner">
+        <table class="menu outer">
+            <tr>
+                
+                    <td><a class="main-nav-link" href="/.">Home</a></td>
+                
+                    <td><a class="main-nav-link" href="/archives">Archives</a></td>
+                
+                    <td><a class="main-nav-link" href="/categories">Categories</a></td>
+                
+                    <td><a class="main-nav-link" href="/tags">Tags</a></td>
+                
+                    <td><a class="main-nav-link" href="/proj">Projects</a></td>
+                
+                    <td><a class="main-nav-link" href="/book">Books</a></td>
+                
+                    <td><a class="main-nav-link" href="/about">About</a></td>
+                
+                <td>
+                    
+    <div class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+    </div>
+
+                </td>
+            </tr>
+        </table>
+    </div>
+</header>
+
+        <div class="outer">
+            
+                
+
+<aside id="profile" class="profile-fixed">
+    <div class="inner profile-inner">
+        <div class="base-info profile-block">
+            <img id="avatar" src="/css/images/image_y.png" />
+            <h2 id="name">Roy Luo</h2>
+            <h3 id="title">Designer &amp; Developer</h3>
+            <span id="location"><i class="fas fa-map-marker-alt" style="padding-right: 5px"></i>Beijing, China</span>
+            <a id="follow" target="_blank" href="https://github.com/royhunter/">FOLLOW</a>
+        </div>
+        <div class="article-info profile-block">
+            <div class="article-info-block">
+                43
+                <span>posts</span>
+            </div>
+            <div class="article-info-block">
+                15
+                <span>tags</span>
+            </div>
+        </div>
+        
+        <div class="profile-block social-links">
+            <table>
+                <tr>
+                    
+                    
+                    <td>
+                        <a href="http://github.com/royhunter/" target="_blank" title="github" class=tooltip>
+                            <i class="fab fa-github"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://twitter.com/RoyLuoye" target="_blank" title="twitter" class=tooltip>
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://www.facebook/roy.luo.3367" target="_blank" title="facebook" class=tooltip>
+                            <i class="fab fa-facebook"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://cn.linkedin.com/in/royluoye" target="_blank" title="linkedin" class=tooltip>
+                            <i class="fab fa-linkedin"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="/atom.xml" target="_blank" title="rss" class=tooltip>
+                            <i class="fab fa-rss"></i>
+                        </a>
+                    </td>
+                    
+                </tr>
+            </table>
+        </div>
+        
+    </div>
+</aside>
+
+            
+            <section id="main"><article id="post-hyper-v" class="article article-type-post" itemscope itemprop="blogPost">
+    <div class="article-inner">
+        
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+            关于Hyper-V的一些理解
+        </h1>
+    
+
+                
+                    <div class="article-meta">
+                        
+    <div class="article-date">
+        <i class="fas fa-calendar-alt"></i>
+        <a href="/2016/05/18/hyper-v/">
+            <time datetime="2016-05-18T13:38:06.000Z" itemprop="datePublished">2016-05-18</time>
+        </a>
+    </div>
+
+
+                        
+    <div class="article-category">
+    	<i class="fas fa-folder"></i>
+        <a class="article-category-link" href="/categories/Hyper-V/">Hyper-V</a>
+    </div>
+
+                        
+    <div class="article-tag">
+        <i class="fas fa-tag"></i>
+        <a class="tag-link" href="/tags/Virtualization/">Virtualization</a>
+    </div>
+
+                    </div>
+                
+            </header>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+        
+            
+            <p>由于工作项目的关系，有机会学习和使用微软的虚拟化软件Hyper-V。由于Hyper-V是个纯商用的软件项目，不像开源的KVM有全部的代码和充足的文档可供阅读，所以目前也是根据官网的仅有的一些介绍性文档和网络资源、部分开源代码进行了学习，此处进行记录，若有不对之处，可以留言、邮件进行探讨。</p>
+<a id="more"></a> 
+<h2 id="Hypervisor的分类"><a href="#Hypervisor的分类" class="headerlink" title="Hypervisor的分类"></a>Hypervisor的分类</h2><p>开始深入Hyper-V之前，有必要了解下Hypervisor的技术分类，在Hypervisor技术的发展过程中，各自采用的架构和理念也不尽相同，大致分为两类,详细见 <a href="https://en.wikipedia.org/wiki/Hypervisor" target="_blank" rel="noopener">https://en.wikipedia.org/wiki/Hypervisor</a></p>
+<blockquote>
+<p>Type-1, native or bare-metal hypervisors</p>
+</blockquote>
+<p>这种Hypervisor直接运行在host的hardware上控制所有的硬件资源并管理Guest OS.<br>这种代表性的虚拟化产品包括：Oracle VM Server for SPARC, Oracle VM Server for x86, the Citrix XenServer, Microsoft’s Hyper-V, and VMware ESX/ESXi.</p>
+<blockquote>
+<p>Type-2 or hosted hypervisors</p>
+</blockquote>
+<p>这种Hypervisor像普通的程序一样运行在传统的OS中，该种Hypervisor将Guest抽象于Host进行管理。<br>这种代表性的虚拟化产品包括：VMware Workstation, VMware Player, VirtualBox and QEMU.</p>
+<p>然而这两种技术的界定并没有那么清楚的区分，Linux的KVM和FreeBSD的bhyve都作为内核模块将Host OS转换成Type-1 Hypervisor。<br>同时，Linux和FreeBSD仍是作为通用操作系统与其他应用程序竞争VM资源，所以KVM和bhyve可以被分类至成Type-2 Hypervisor</p>
+<p>由上论述及下图可见hyper-v与KVM从技术角度看是完全两种不同的路线。</p>
+<p><img src="http://7j1zal.com1.z0.glb.clouddn.com/hypervisor.PNG" alt=""></p>
+<h2 id="hyper-v的架构"><a href="#hyper-v的架构" class="headerlink" title="hyper-v的架构"></a>hyper-v的架构</h2><p>Hyper-V是一种针对x64 versions of Windows Server 2008以及更高版本的基于hypervisor的虚拟化技术。和其它Hypervisor一样，其也支持多个OS的隔离并共享hardware资源。</p>
+<p><img src="http://7j1zal.com1.z0.glb.clouddn.com/hv_arch.PNG" alt=""></p>
+<p>Hyper-V支持隔离性主要是使用了一个称为“partition”的概念。一个partition是一个独立逻辑单元。Hyper-V的运行必须至少拥有一个parent或root的partition，虚拟栈运行在parent的partition中，拥有直接访问硬件设备的能力。Parent partition用来创建child partition，这里就是指Guest OS。</p>
+<p>Partition不能直接访问物理处理器，不能处理处理器中断，而是Hypervisor来接管处理，并重定向到指定的partition，Hyper-V和KVM一样，也提供了IOMMU来提高IO的性能。</p>
+<p>Child partition不能直接访问硬件设备，而是通过vmbus或者Hypervisor来访问处于parent partition中的设备，VMBus则是partition之间的内部通信通道。</p>
+<p>VSPs(Virtualization Service Providers)位于parent partition中，接收来自于child partition的request。<br>VSCs(Virtualization Client Providers)位于child partition中，通过VMBus重定向对dev的request到VSPs。</p>
+<h2 id="Linux-Integration-Services-LIS"><a href="#Linux-Integration-Services-LIS" class="headerlink" title="Linux Integration Services(LIS)"></a>Linux Integration Services(LIS)</h2><p>回到2008年，当微软意识到其在虚拟化技术和云服务上已落后，公司的一部分研发资源就投入到了Hyper-V虚拟化环境。而最开始的时候Hyper-V只支持Windows client systems. Redmond不久意识到对Linux支持的重要性，2009年开始支持Linux Guest，然而仅提供Linux虚拟机的基础性的功能是不够的，为具备竞争力，微软投入了更多的研发资源来提高Linux guest的performance.</p>
+<p>LIS(Linux Integration Services)就是当时为Linux虚拟化提供更好，更快，更多集成服务的软件产品。LIS类似运行在ESX Server上的VMware tools。</p>
+<h3 id="Understanding-LIS"><a href="#Understanding-LIS" class="headerlink" title="Understanding LIS"></a>Understanding LIS</h3><p>LIS的运行形式为运行在Host和Guest中的一组系统级driver。其提供了两种类型的组件：</p>
+<ol>
+<li>Driver</li>
+<li>Services</li>
+</ol>
+<p>Driver通过支持guest对Host的直接访问来增强系统的整体性能。比如VMBus Driver通过减少Guest和Host之间的层次结构来减少通信消耗。</p>
+<p>Services则提供了特定的服务功能，例如Guest和Host的时间同步服务。</p>
+<h4 id="LIS提供的driver"><a href="#LIS提供的driver" class="headerlink" title="LIS提供的driver"></a>LIS提供的driver</h4><ol>
+<li>VMBus</li>
+<li>VSP/VSC</li>
+<li>SCSI Driver</li>
+<li>IDE Driver</li>
+<li>VMBus Network Controller Drivers</li>
+<li>Hyper-V Balloon Driver</li>
+<li>HID-Compatible Mouse Driver</li>
+</ol>
+<h4 id="LIS提供的services"><a href="#LIS提供的services" class="headerlink" title="LIS提供的services"></a>LIS提供的services</h4><ol>
+<li>Time Synchronization</li>
+<li>Guest Shutdown</li>
+<li>Heartbeat</li>
+<li>Data Exchange</li>
+</ol>
+<p><img src="http://7j1zal.com1.z0.glb.clouddn.com/hv_driver.PNG" alt=""></p>
+<p>具备LIS能力的Guest在Hyper-V的架构中可以称为Enlightened. 我的理解其类似于Para Virtualization. 通过一组特定的半虚拟化驱动来提高整体性能， LIS的driver直接类比于virtio。</p>
+<h2 id="代码部分"><a href="#代码部分" class="headerlink" title="代码部分"></a>代码部分</h2><p>目前Linux内核主线代码已经全部支持LIS，且默认使能，当在Hyper-V上install Linux的发行版，比如Ubuntu后，就能看到LIS驱动的各类设备。<br>在Linux内核中的各类驱动可以理解为类似virtio的前端代码。</p>
+<p>代码主要集中在如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">drivers\hv   主要是VMBus driver，channel管理，ring buffer的相关code</span><br><span class="line">drivers\net\hyperv  主要是网络设备相关的driver code</span><br><span class="line">arch/x86/kernel/cpu/hypervisor.c   体系结构支持code</span><br><span class="line">arch/x86/kernel/cpu/mshyperv.c     Hyper-V spec code</span><br></pre></td></tr></table></figure>
+<p>LIS Driver code在Linux内核中必然遵循的是Linux Driver开发的体系结构：Bus、Device、Driver。<br>VMBus作为一种总线（bus)注册，可以类比为PCI，而net,ide,scsi,ballon做为device注册，hv_netvsc/hv_storvsc/hv_ballon作为driver注册。<br>下面是code阅读记录，参看图，流程不过多赘述，主要说明几个Hyper-V相关的特定操作。</p>
+<h3 id="Hypervisor的检测"><a href="#Hypervisor的检测" class="headerlink" title="Hypervisor的检测"></a>Hypervisor的检测</h3><p>Linux初始化时会对支持的Hypervisor进行检测，调用指定的平台处理函数<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> <span class="keyword">const</span> __initconst <span class="class"><span class="keyword">struct</span> <span class="title">hypervisor_x86</span> * <span class="title">const</span> <span class="title">hypervisors</span>[] =</span></span><br><span class="line"><span class="class">&#123;</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">ifdef</span> CONFIG_XEN_PVHVM</span></span><br><span class="line">	&amp;x86_hyper_xen_hvm,</span><br><span class="line"><span class="meta">#<span class="meta-keyword">endif</span></span></span><br><span class="line">	&amp;x86_hyper_vmware,</span><br><span class="line">	&amp;x86_hyper_ms_hyperv,   &lt;--------------------</span><br><span class="line"><span class="meta">#<span class="meta-keyword">ifdef</span> CONFIG_KVM_GUEST</span></span><br><span class="line">	&amp;x86_hyper_kvm,</span><br><span class="line"><span class="meta">#<span class="meta-keyword">endif</span></span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> __refconst <span class="class"><span class="keyword">struct</span> <span class="title">hypervisor_x86</span> <span class="title">x86_hyper_ms_hyperv</span> = &#123;</span></span><br><span class="line">	.name			= <span class="string">"Microsoft HyperV"</span>,</span><br><span class="line">	.detect			= ms_hyperv_platform,</span><br><span class="line">	.init_platform		= ms_hyperv_init_platform,</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">static</span> <span class="keyword">inline</span> <span class="keyword">void</span> __init</span><br><span class="line">detect_hypervisor_vendor(<span class="keyword">void</span>)</span><br><span class="line">&#123;</span><br><span class="line">	<span class="keyword">const</span> <span class="class"><span class="keyword">struct</span> <span class="title">hypervisor_x86</span> *<span class="title">h</span>, * <span class="title">const</span> *<span class="title">p</span>;</span></span><br><span class="line">	<span class="keyword">uint32_t</span> pri, max_pri = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">for</span> (p = hypervisors; p &lt; hypervisors + ARRAY_SIZE(hypervisors); p++) &#123;</span><br><span class="line">		h = *p;</span><br><span class="line">		pri = h-&gt;detect();</span><br><span class="line">		<span class="keyword">if</span> (pri != <span class="number">0</span> &amp;&amp; pri &gt; max_pri) &#123;</span><br><span class="line">			max_pri = pri;</span><br><span class="line">			x86_hyper = h;</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">void</span> __<span class="function">init <span class="title">init_hypervisor_platform</span><span class="params">(<span class="keyword">void</span>)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line"></span><br><span class="line">	detect_hypervisor_vendor();</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> (!x86_hyper)</span><br><span class="line">		<span class="keyword">return</span>;</span><br><span class="line"></span><br><span class="line">	init_hypervisor(&amp;boot_cpu_data);</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> (x86_hyper-&gt;init_platform)</span><br><span class="line">		x86_hyper-&gt;init_platform();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<h3 id="hypercall"><a href="#hypercall" class="headerlink" title="hypercall"></a>hypercall</h3><p>在Hyper-V中，Guest到Hypervisor的消息传递通过hypercall来实现，hypercall有message和event两种类型。<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* Declare the various hypercall operations. */</span></span><br><span class="line"><span class="keyword">enum</span> hv_call_code &#123;</span><br><span class="line">	HVCALL_POST_MESSAGE	= <span class="number">0x005c</span>,</span><br><span class="line">	HVCALL_SIGNAL_EVENT	= <span class="number">0x005d</span>,</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">static</span> u64 <span class="title">do_hypercall</span><span class="params">(u64 control, <span class="keyword">void</span> *input, <span class="keyword">void</span> *output)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	u64 hv_status = <span class="number">0</span>;</span><br><span class="line">	u64 input_address = (input) ? virt_to_phys(input) : <span class="number">0</span>;</span><br><span class="line">	u64 output_address = (output) ? virt_to_phys(output) : <span class="number">0</span>;</span><br><span class="line">	<span class="keyword">void</span> *hypercall_page = hv_context.hypercall_page;</span><br><span class="line"></span><br><span class="line">	__asm__ __volatile__(<span class="string">"mov %0, %%r8"</span> : : <span class="string">"r"</span> (output_address) : <span class="string">"r8"</span>);</span><br><span class="line">	__asm__ __volatile__(<span class="string">"call *%3"</span> : <span class="string">"=a"</span> (hv_status) :</span><br><span class="line">			     <span class="string">"c"</span> (control), <span class="string">"d"</span> (input_address),</span><br><span class="line">			     <span class="string">"m"</span> (hypercall_page));</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<h3 id="共享page"><a href="#共享page" class="headerlink" title="共享page"></a>共享page</h3><p>Guest与Hypervisor的数据传输则通过共享page来实现。<br>例如vmconnection中的interrupt state page, monitor page,  VMBus channel中的ring buffer， hv_netvsc driver中的recv buffer.<br>通过vmbus_establish_gpadl建立guest physical address description list. 将gpadlmsg使用hypercall通告hypervisor。<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/*</span></span><br><span class="line"><span class="comment"> * vmbus_establish_gpadl - Estabish a GPADL for the specified buffer</span></span><br><span class="line"><span class="comment"> *</span></span><br><span class="line"><span class="comment"> * @channel: a channel</span></span><br><span class="line"><span class="comment"> * @kbuffer: from kmalloc or vmalloc</span></span><br><span class="line"><span class="comment"> * @size: page-size multiple</span></span><br><span class="line"><span class="comment"> * @gpadl_handle: some funky thing</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">vmbus_establish_gpadl</span><span class="params">(struct vmbus_channel *channel, <span class="keyword">void</span> *kbuffer,</span></span></span><br><span class="line"><span class="function"><span class="params">			       u32 size, u32 *gpadl_handle)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    ...</span><br><span class="line">    next_gpadl_handle = atomic_read(&amp;vmbus_connection.next_gpadl_handle);</span><br><span class="line">	atomic_inc(&amp;vmbus_connection.next_gpadl_handle);</span><br><span class="line">	...</span><br><span class="line">    ret = create_gpadl_header(kbuffer, size, &amp;msginfo, &amp;msgcount);</span><br><span class="line">    ...</span><br><span class="line">    gpadlmsg = (struct vmbus_channel_gpadl_header *)msginfo-&gt;msg;  &lt;---组装gpadl msg</span><br><span class="line">	gpadlmsg-&gt;header.msgtype = CHANNELMSG_GPADL_HEADER;</span><br><span class="line">	gpadlmsg-&gt;child_relid = channel-&gt;offermsg.child_relid;</span><br><span class="line">	gpadlmsg-&gt;gpadl = next_gpadl_handle;</span><br><span class="line">	...</span><br><span class="line">	vmbus_post_msg(gpadlmsg, msginfo-&gt;msgsize - <span class="keyword">sizeof</span>(*msginfo));</span><br><span class="line">	...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<h3 id="code-walk-through"><a href="#code-walk-through" class="headerlink" title="code walk through"></a>code walk through</h3><h4 id="VMBus的初始化"><a href="#VMBus的初始化" class="headerlink" title="VMBus的初始化"></a>VMBus的初始化</h4><p><img src="http://7j1zal.com1.z0.glb.clouddn.com/code_1.PNG" alt=""></p>
+<h4 id="HV设备的注册"><a href="#HV设备的注册" class="headerlink" title="HV设备的注册"></a>HV设备的注册</h4><p><img src="http://7j1zal.com1.z0.glb.clouddn.com/code_2.PNG" alt=""></p>
+<h4 id="整体架构"><a href="#整体架构" class="headerlink" title="整体架构"></a>整体架构</h4><p><img src="http://7j1zal.com1.z0.glb.clouddn.com/code_3.PNG" alt=""></p>
+<h2 id="参考文档"><a href="#参考文档" class="headerlink" title="参考文档"></a>参考文档</h2><ol>
+<li><a href="https://msdn.microsoft.com/en-us/library/cc768520(v=bts.10" target="_blank" rel="noopener">https://msdn.microsoft.com/en-us/library/cc768520(v=bts.10).aspx</a>.aspx)</li>
+<li><a href="http://www.virtuatopia.com/index.php/An_Overview_of_the_Hyper-V_Architecture" target="_blank" rel="noopener">http://www.virtuatopia.com/index.php/An_Overview_of_the_Hyper-V_Architecture</a></li>
+<li><a href="http://kristiannese.blogspot.com/2011/01/what-about-vmbus-hyper-v-architecture.html" target="_blank" rel="noopener">http://kristiannese.blogspot.com/2011/01/what-about-vmbus-hyper-v-architecture.html</a> </li>
+<li><a href="http://www.linux-magazine.com/Issues/2014/158/Linux-Integration-Services" target="_blank" rel="noopener">http://www.linux-magazine.com/Issues/2014/158/Linux-Integration-Services</a></li>
+<li><a href="https://github.com/LIS" target="_blank" rel="noopener">https://github.com/LIS</a></li>
+</ol>
+
+        
+        </div>
+        <footer class="article-footer">
+            <div class="share-container">
+
+
+
+</div>
+
+    <a data-url="http://royhunter.github.io/2016/05/18/hyper-v/" data-id="ck2oe6fny0017xkkvzwys8zli" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+<script>
+    (function ($) {
+        // Prevent duplicate binding
+        if (typeof(__SHARE_BUTTON_BINDED__) === 'undefined' || !__SHARE_BUTTON_BINDED__) {
+            __SHARE_BUTTON_BINDED__ = true;
+        } else {
+            return;
+        }
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url'),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="fab fa-twitter article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="fab fa-facebook article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="fab fa-pinterest article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                            '<a href="https://plus.google.com/share?url=' + encodedUrl + '" class="fab fa-google article-share-google" target="_blank" title="Google+"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+            
+    
+
+        </footer>
+    </div>
+    
+        
+<nav id="article-nav">
+    
+        <a href="/2016/06/14/git/" id="article-nav-newer" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Newer</strong>
+            <div class="article-nav-title">
+                
+                    常用Git命令速查笔记
+                
+            </div>
+        </a>
+    
+    
+        <a href="/2016/03/16/raft/" id="article-nav-older" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Older</strong>
+            <div class="article-nav-title">Distributed Concensus:Raft</div>
+        </a>
+    
+</nav>
+
+
+    
+</article>
+
+
+    
+    
+
+</section>
+            
+                
+<aside id="sidebar">
+   
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">recent</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2020/07/12/index/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"></p>
+                            <p class="item-title"><a href="/2020/07/12/index/" class="title">Blog索引</a></p>
+                            <p class="item-date"><time datetime="2020-07-12T13:33:28.000Z" itemprop="datePublished">2020-07-12</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/07/17/ovs02-vxlan/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/07/17/ovs02-vxlan/" class="title">OVS02-VXLAN内核相关实现</a></p>
+                            <p class="item-date"><time datetime="2018-07-17T12:15:34.000Z" itemprop="datePublished">2018-07-17</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/01/10/perf-tunning/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/01/10/perf-tunning/" class="title">datapath性能优化总结</a></p>
+                            <p class="item-date"><time datetime="2018-01-10T13:26:32.000Z" itemprop="datePublished">2018-01-10</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2017/04/18/ovs01/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2017/04/18/ovs01/" class="title">OVS01-OVS基础-安装、配置、Simple Case</a></p>
+                            <p class="item-date"><time datetime="2017-04-18T13:26:32.000Z" itemprop="datePublished">2017-04-18</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2016/08/28/trampolines-for-nested-functions/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Programme/">Programme</a></p>
+                            <p class="item-title"><a href="/2016/08/28/trampolines-for-nested-functions/" class="title">Trampolines for Nested Functions in GCC</a></p>
+                            <p class="item-date"><time datetime="2016-08-28T13:26:32.000Z" itemprop="datePublished">2016-08-28</time></p>
+                        </div>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">categories</h3>
+        <div class="widget">
+            <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Algorithm/">Algorithm</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Container/">Container</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Docker/">Docker</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Hyper-V/">Hyper-V</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/KVM/">KVM</a><span class="category-list-count">22</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Misc/">Misc</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/PROGRAMME/">PROGRAMME</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Programme/">Programme</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Virtualization/">Virtualization</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/go/">go</a><span class="category-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">archives</h3>
+        <div class="widget">
+            <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">July 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">July 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">January 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">April 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">August 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/06/">June 2016</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/05/">May 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/03/">March 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/02/">February 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/01/">January 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/12/">December 2015</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/11/">November 2015</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/08/">August 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/07/">July 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/06/">June 2014</a><span class="archive-list-count">5</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tags</h3>
+        <div class="widget">
+            <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Container/">Container</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Distribute/">Distribute</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/EPT/">EPT</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux-namespace/">Linux namespace</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Network/">Network</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/PROGRAMME/">PROGRAMME</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Programme-Language/">Programme Language</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/QEMU/">QEMU</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Tools/">Tools</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization/">Virtualization</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization-KVM-QEMU/">Virtualization KVM QEMU</a><span class="tag-list-count">9</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/libvirt/">libvirt</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vhost/">vhost</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/virtio/">virtio</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vps-proxy/">vps_proxy</a><span class="tag-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tag cloud</h3>
+        <div class="widget tagcloud">
+            <a href="/tags/Container/" style="font-size: 12.5px;">Container</a> <a href="/tags/Distribute/" style="font-size: 12.5px;">Distribute</a> <a href="/tags/EPT/" style="font-size: 12.5px;">EPT</a> <a href="/tags/Linux-namespace/" style="font-size: 12.5px;">Linux namespace</a> <a href="/tags/Network/" style="font-size: 15px;">Network</a> <a href="/tags/PROGRAMME/" style="font-size: 10px;">PROGRAMME</a> <a href="/tags/Programme-Language/" style="font-size: 10px;">Programme Language</a> <a href="/tags/QEMU/" style="font-size: 12.5px;">QEMU</a> <a href="/tags/Tools/" style="font-size: 12.5px;">Tools</a> <a href="/tags/Virtualization/" style="font-size: 17.5px;">Virtualization</a> <a href="/tags/Virtualization-KVM-QEMU/" style="font-size: 20px;">Virtualization KVM QEMU</a> <a href="/tags/libvirt/" style="font-size: 10px;">libvirt</a> <a href="/tags/vhost/" style="font-size: 10px;">vhost</a> <a href="/tags/virtio/" style="font-size: 17.5px;">virtio</a> <a href="/tags/vps-proxy/" style="font-size: 10px;">vps_proxy</a>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">links</h3>
+        <div class="widget">
+            <ul>
+                
+                    <li>
+                        <a href="http://hexo.io">Hexo</a>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+
+    
+    <div id="toTop" class="fas fa-angle-up"></div>
+</aside>
+
+            
+        </div>
+        <footer id="footer">
+    <div class="outer">
+        <div id="footer-info" class="inner">
+            &copy; 2019 John Doe<br>
+            Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>. Theme by <a href="http://github.com/ppoffice">PPOffice</a>
+        </div>
+    </div>
+</footer>
+        
+
+
+    
+        <script src="/libs/lightgallery/js/lightgallery.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-thumbnail.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-pager.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-autoplay.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-fullscreen.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-zoom.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-hash.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-share.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-video.min.js"></script>
+    
+    
+        <script src="/libs/justified-gallery/jquery.justifiedGallery.min.js"></script>
+    
+    
+
+
+
+<!-- Custom Scripts -->
+<script src="/js/main.js"></script>
+
+    </div>
+</body>
+</html>

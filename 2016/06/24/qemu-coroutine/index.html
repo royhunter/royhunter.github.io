@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <meta charset="utf-8">
+    
+    <title>QEMU中的协程---qemu-coroutine | RoyLuo&#39;s Notes</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="description" content="之前只使用过Golang的协程，听说过Lua的协程，这里第一次在qemu中看到C语言也可以实现自己的协程，qemu在对块数据的读写过程中大量使用了协程，借此对C版的协程相关做一个分析和记录。">
+<meta name="keywords" content="QEMU">
+<meta property="og:type" content="article">
+<meta property="og:title" content="QEMU中的协程---qemu-coroutine">
+<meta property="og:url" content="http://royhunter.github.io/2016/06/24/qemu-coroutine/index.html">
+<meta property="og:site_name" content="RoyLuo&#39;s Notes">
+<meta property="og:description" content="之前只使用过Golang的协程，听说过Lua的协程，这里第一次在qemu中看到C语言也可以实现自己的协程，qemu在对块数据的读写过程中大量使用了协程，借此对C版的协程相关做一个分析和记录。">
+<meta property="og:locale" content="en">
+<meta property="og:image" content="http://7j1zal.com1.z0.glb.clouddn.com/qemu-coroutine.PNG">
+<meta property="og:updated_time" content="2016-06-28T14:26:54.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="QEMU中的协程---qemu-coroutine">
+<meta name="twitter:description" content="之前只使用过Golang的协程，听说过Lua的协程，这里第一次在qemu中看到C语言也可以实现自己的协程，qemu在对块数据的读写过程中大量使用了协程，借此对C版的协程相关做一个分析和记录。">
+<meta name="twitter:image" content="http://7j1zal.com1.z0.glb.clouddn.com/qemu-coroutine.PNG">
+    
+
+    
+        <link rel="alternate" href="atom.xml" title="RoyLuo&#39;s Notes" type="application/atom+xml" />
+    
+
+    
+
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fontawesome.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-brands.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-solid.min.css">
+    <link rel="stylesheet" href="/libs/open-sans/styles.css">
+    <link rel="stylesheet" href="/libs/source-code-pro/styles.css">
+
+    <link rel="stylesheet" href="/css/style.css">
+
+    <script src="/libs/jquery/2.1.3/jquery.min.js"></script>
+    
+    
+        <link rel="stylesheet" href="/libs/lightgallery/css/lightgallery.min.css">
+    
+    
+        <link rel="stylesheet" href="/libs/justified-gallery/justifiedGallery.min.css">
+    
+    
+    
+    
+
+
+</head>
+
+<body>
+    <div id="container">
+        <header id="header">
+    <div id="header-main" class="header-inner">
+        <div class="outer">
+            <a href="/" id="logo">
+                <i class="logo"></i>
+                <span class="site-title">RoyLuo&#39;s Notes</span>
+            </a>
+            <nav id="main-nav">
+                
+                    <a class="main-nav-link" href="/.">Home</a>
+                
+                    <a class="main-nav-link" href="/archives">Archives</a>
+                
+                    <a class="main-nav-link" href="/categories">Categories</a>
+                
+                    <a class="main-nav-link" href="/tags">Tags</a>
+                
+                    <a class="main-nav-link" href="/proj">Projects</a>
+                
+                    <a class="main-nav-link" href="/book">Books</a>
+                
+                    <a class="main-nav-link" href="/about">About</a>
+                
+            </nav>
+            
+                
+                <nav id="sub-nav">
+                    <div class="profile" id="profile-nav">
+                        <a id="profile-anchor" href="javascript:;">
+                            <img class="avatar" src="/css/images/image_y.png" />
+                            <i class="fas fa-caret-down"></i>
+                        </a>
+                    </div>
+                </nav>
+            
+            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+        <button type="submit" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" placeholder="Type something..." />
+            <span class="ins-close ins-selectable"><i class="fas fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script>
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: 'Posts',
+            PAGES: 'Pages',
+            CATEGORIES: 'Categories',
+            TAGS: 'Tags',
+            UNTITLED: '(Untitled)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+<script src="/js/insight.js"></script>
+
+</div>
+        </div>
+    </div>
+    <div id="main-nav-mobile" class="header-sub header-inner">
+        <table class="menu outer">
+            <tr>
+                
+                    <td><a class="main-nav-link" href="/.">Home</a></td>
+                
+                    <td><a class="main-nav-link" href="/archives">Archives</a></td>
+                
+                    <td><a class="main-nav-link" href="/categories">Categories</a></td>
+                
+                    <td><a class="main-nav-link" href="/tags">Tags</a></td>
+                
+                    <td><a class="main-nav-link" href="/proj">Projects</a></td>
+                
+                    <td><a class="main-nav-link" href="/book">Books</a></td>
+                
+                    <td><a class="main-nav-link" href="/about">About</a></td>
+                
+                <td>
+                    
+    <div class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+    </div>
+
+                </td>
+            </tr>
+        </table>
+    </div>
+</header>
+
+        <div class="outer">
+            
+                
+
+<aside id="profile" class="profile-fixed">
+    <div class="inner profile-inner">
+        <div class="base-info profile-block">
+            <img id="avatar" src="/css/images/image_y.png" />
+            <h2 id="name">Roy Luo</h2>
+            <h3 id="title">Designer &amp; Developer</h3>
+            <span id="location"><i class="fas fa-map-marker-alt" style="padding-right: 5px"></i>Beijing, China</span>
+            <a id="follow" target="_blank" href="https://github.com/royhunter/">FOLLOW</a>
+        </div>
+        <div class="article-info profile-block">
+            <div class="article-info-block">
+                43
+                <span>posts</span>
+            </div>
+            <div class="article-info-block">
+                15
+                <span>tags</span>
+            </div>
+        </div>
+        
+        <div class="profile-block social-links">
+            <table>
+                <tr>
+                    
+                    
+                    <td>
+                        <a href="http://github.com/royhunter/" target="_blank" title="github" class=tooltip>
+                            <i class="fab fa-github"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://twitter.com/RoyLuoye" target="_blank" title="twitter" class=tooltip>
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://www.facebook/roy.luo.3367" target="_blank" title="facebook" class=tooltip>
+                            <i class="fab fa-facebook"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://cn.linkedin.com/in/royluoye" target="_blank" title="linkedin" class=tooltip>
+                            <i class="fab fa-linkedin"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="/atom.xml" target="_blank" title="rss" class=tooltip>
+                            <i class="fab fa-rss"></i>
+                        </a>
+                    </td>
+                    
+                </tr>
+            </table>
+        </div>
+        
+    </div>
+</aside>
+
+            
+            <section id="main"><article id="post-qemu-coroutine" class="article article-type-post" itemscope itemprop="blogPost">
+    <div class="article-inner">
+        
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+            QEMU中的协程---qemu-coroutine
+        </h1>
+    
+
+                
+                    <div class="article-meta">
+                        
+    <div class="article-date">
+        <i class="fas fa-calendar-alt"></i>
+        <a href="/2016/06/24/qemu-coroutine/">
+            <time datetime="2016-06-24T12:38:53.000Z" itemprop="datePublished">2016-06-24</time>
+        </a>
+    </div>
+
+
+                        
+    <div class="article-category">
+    	<i class="fas fa-folder"></i>
+        <a class="article-category-link" href="/categories/Programme/">Programme</a>
+    </div>
+
+                        
+    <div class="article-tag">
+        <i class="fas fa-tag"></i>
+        <a class="tag-link" href="/tags/QEMU/">QEMU</a>
+    </div>
+
+                    </div>
+                
+            </header>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+        
+            
+            <p>之前只使用过Golang的协程，听说过Lua的协程，这里第一次在qemu中看到C语言也可以实现自己的协程，qemu在对块数据的读写过程中大量使用了协程，借此对C版的协程相关做一个分析和记录。</p>
+<a id="more"></a> 
+<h2 id="协程"><a href="#协程" class="headerlink" title="协程"></a>协程</h2><p>协程是一种用户态的轻量级线程，相对于系统独立，有自己的上下文，协程的切换也由自己控制，所以相对于进程和线程来说其运行的开销要小得多。</p>
+<h2 id="为什么qemu要使用协程"><a href="#为什么qemu要使用协程" class="headerlink" title="为什么qemu要使用协程"></a>为什么qemu要使用协程</h2><p>根据qemu的commit log中给出的解释：<br><a href="http://qemu.11.n7.nabble.com/PATCH-v3-0-4-Coroutines-for-better-asynchronous-programming-td9809.html" target="_blank" rel="noopener">http://qemu.11.n7.nabble.com/PATCH-v3-0-4-Coroutines-for-better-asynchronous-programming-td9809.html</a><br>QEMU作为虚拟化软件其主体架构采用的是事件驱动模式，在main-loop中监控各种、大量的文件，事件，消息和状态的变化并进行各种操作，当大量的阻塞操作发生时，为不影响VM环境的执行效率，一般都采用异步的方式。而异步方式则需要设定callback函数的调用时机，同时保存大量的执行状态，导致逻辑代码支离破碎，复杂并难以理解。所以最好的解决方式是采用协程的方式将同步方式的代码异步化。</p>
+<h2 id="qemu-coroutine-API"><a href="#qemu-coroutine-API" class="headerlink" title="qemu-coroutine API"></a>qemu-coroutine API</h2><p>源码：<br>qemu-coroutine.c<br>coroutine-ucontext.c<br>coroutine-ucontext.h   </p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/*</span></span><br><span class="line"><span class="comment"> * 创建新的协程</span></span><br><span class="line"><span class="comment"> * 使用qemu_coroutine_enter() 进入协程执行环境.</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="function">Coroutine *<span class="title">qemu_coroutine_create</span><span class="params">(CoroutineEntry *entry)</span></span></span><br><span class="line"><span class="function"></span></span><br><span class="line"><span class="function"><span class="comment">/**</span></span></span><br><span class="line"><span class="function"><span class="comment"> * 进入协程执行环境</span></span></span><br><span class="line"><span class="function"><span class="comment"> *</span></span></span><br><span class="line"><span class="function"><span class="comment"> * opaque为传递给协程执行入口参数</span></span></span><br><span class="line"><span class="function"><span class="comment"> */</span></span></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">qemu_coroutine_enter</span><span class="params">(Coroutine *coroutine, <span class="keyword">void</span> *opaque)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 转移执行控制权到协程的调用者处</span></span><br><span class="line"><span class="comment"> *</span></span><br><span class="line"><span class="comment"> * 这个函数不会返回除非使用qemu_coroutine_enter()重新进入协程</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="function"><span class="keyword">void</span> coroutine_fn <span class="title">qemu_coroutine_yield</span><span class="params">(<span class="keyword">void</span>)</span></span>;</span><br></pre></td></tr></table></figure>
+<p>qemu协程使用非常简单，创建并启动协程：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">coroutine = qemu_coroutine_create(my_coroutine); </span><br><span class="line">qemu_coroutine_enter(coroutine, my_data);</span><br></pre></td></tr></table></figure></p>
+<p>coroutine协程则会执行直到退出或者yields<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> coroutine_fn <span class="title">my_coroutine</span><span class="params">(<span class="keyword">void</span> *opaque)</span> </span>&#123; </span><br><span class="line">      MyData *my_data = opaque; </span><br><span class="line"></span><br><span class="line">      <span class="comment">/* do some work */</span> </span><br><span class="line"></span><br><span class="line">      qemu_coroutine_yield(); </span><br><span class="line"></span><br><span class="line">      <span class="comment">/* do some more work */</span> </span><br><span class="line">  &#125;</span><br></pre></td></tr></table></figure></p>
+<p>yielding 会切换回qemu_coroutine_enter的调用者，qemu中则在发起一个异步的I/O请求后切回主线程的event loop。</p>
+<h2 id="qemu协程基础"><a href="#qemu协程基础" class="headerlink" title="qemu协程基础"></a>qemu协程基础</h2><p>qemu-coroutine的实现有gthread,ucontext,sigalstack等几种模式，这里主要看ucontext模式,而coroutine的基础是setjmp/longjmp.</p>
+<h3 id="setjmp-longjmp"><a href="#setjmp-longjmp" class="headerlink" title="setjmp/longjmp"></a>setjmp/longjmp</h3><p>setjmp/longjmp是C语言的一组库函数，主要作用是“非本地跳转”，区别于goto，它们能够完成函数外部的跳转。<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">setjmp</span><span class="params">( jmp_buf env )</span></span>;   <span class="comment">//用于保存程序的运行时的堆栈环境</span></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">longjmp</span><span class="params">( jmp_buf env, <span class="keyword">int</span> value )</span></span>; <span class="comment">//用于恢复先前程序中调用的setjmp函数时所保存的堆栈环境,参数value为setjmp返回值</span></span><br></pre></td></tr></table></figure></p>
+<p>从setjmp/longjmp的源码实现看，其主要作用就是save、restore当前程序的运行上下文，包括寄存器、堆栈信息等到jmp_buf中。<br>源码位置glibc：<br>sysdeps/i386/setjmp.S<br>sysdeps/i386/__longjmp.S</p>
+<p>下面是个简单的例子：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;setjmp.h&gt;</span></span></span><br><span class="line"></span><br><span class="line">main()</span><br><span class="line">&#123;</span><br><span class="line">  jmp_buf env;</span><br><span class="line">  <span class="keyword">int</span> i;</span><br><span class="line"></span><br><span class="line">  i = setjmp(env);  <span class="comment">//保存此处的程序运行上下文到env中</span></span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">"i = %d\n"</span>, i);</span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (i != <span class="number">0</span>) <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line"></span><br><span class="line">  longjmp(env, <span class="number">2</span>);    <span class="comment">//跳转到env保存的上下文中，即setjmp处，是setjmp返回值为2</span></span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">"Does this line get printed?\n"</span>);</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>运行结果为：<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">i = 0</span><br><span class="line">i = 2</span><br></pre></td></tr></table></figure></p>
+<h3 id="ucontext"><a href="#ucontext" class="headerlink" title="ucontext"></a>ucontext</h3><p>ucontext函数组为setjmp/longjmp的升级版：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span>  <span class="title">getcontext</span><span class="params">(<span class="keyword">ucontext_t</span> *)</span></span>; <span class="comment">//初始化ucontext_t结构体，将当前的上下文保存到ucontext_t中</span></span><br><span class="line"><span class="function"><span class="keyword">int</span>  <span class="title">setcontext</span><span class="params">(<span class="keyword">const</span> <span class="keyword">ucontext_t</span> *)</span></span>;  <span class="comment">//设置当前的上下文为ucontext_t,并跳转至其中</span></span><br><span class="line">void makecontext(ucontext_t *, (void *)(), int, ...); //制造一个上下文，并设置入口函数</span><br><span class="line"><span class="function"><span class="keyword">int</span>  <span class="title">swapcontext</span><span class="params">(<span class="keyword">ucontext_t</span> *, <span class="keyword">const</span> <span class="keyword">ucontext_t</span> *)</span></span>; <span class="comment">//保存当前上下文到第一个参数中，然后切换到第二个参数代表的上下文。</span></span><br></pre></td></tr></table></figure></p>
+<p>例程：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;ucontext.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;unistd.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">const</span> <span class="keyword">char</span> *argv[])</span></span>&#123;</span><br><span class="line">	<span class="keyword">ucontext_t</span> context;</span><br><span class="line">	</span><br><span class="line">	getcontext(&amp;context);</span><br><span class="line">	<span class="built_in">puts</span>(<span class="string">"Hello world"</span>);</span><br><span class="line">	sleep(<span class="number">1</span>);</span><br><span class="line">	setcontext(&amp;context);</span><br><span class="line">	<span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>运行结果：<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">~$ ./example   </span><br><span class="line">Hello world  </span><br><span class="line">Hello world  </span><br><span class="line">Hello world  </span><br><span class="line">Hello world</span><br><span class="line">^C  </span><br><span class="line">~$</span><br></pre></td></tr></table></figure></p>
+<h2 id="qemu-coroutine的实现"><a href="#qemu-coroutine的实现" class="headerlink" title="qemu-coroutine的实现"></a>qemu-coroutine的实现</h2><p>qemu-coroutine主要基于setjmp/longjmp实现，更为轻量级。<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Coroutine *<span class="title">qemu_coroutine_create</span><span class="params">(CoroutineEntry *entry)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    Coroutine *co = qemu_coroutine_new();  <span class="comment">// 创建一个新的coroutine</span></span><br><span class="line">    co-&gt;entry = entry;   <span class="comment">//设置coroutine的入口函数为entry</span></span><br><span class="line">    <span class="keyword">return</span> co;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">static</span> Coroutine *<span class="title">coroutine_new</span><span class="params">(<span class="keyword">void</span>)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="keyword">const</span> <span class="keyword">size_t</span> stack_size = <span class="number">1</span> &lt;&lt; <span class="number">20</span>;</span><br><span class="line">    CoroutineUContext *co;</span><br><span class="line">    <span class="keyword">ucontext_t</span> old_uc, uc;</span><br><span class="line">    jmp_buf old_env;</span><br><span class="line">    <span class="keyword">union</span> cc_arg arg = &#123;<span class="number">0</span>&#125;;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (getcontext(&amp;uc) == <span class="number">-1</span>) &#123;     <span class="comment">//获得当前上下文</span></span><br><span class="line">        <span class="built_in">abort</span>();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    co = g_malloc0(<span class="keyword">sizeof</span>(*co));</span><br><span class="line">    co-&gt;<span class="built_in">stack</span> = g_malloc(stack_size);</span><br><span class="line">    co-&gt;base.entry_arg = &amp;old_env; <span class="comment">/* stash away our jmp_buf */</span></span><br><span class="line"></span><br><span class="line">    uc.uc_link = &amp;old_uc;</span><br><span class="line">    uc.uc_stack.ss_sp = co-&gt;<span class="built_in">stack</span>;</span><br><span class="line">    uc.uc_stack.ss_size = stack_size;</span><br><span class="line">    uc.uc_stack.ss_flags = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">    arg.p = co;</span><br><span class="line"></span><br><span class="line">    makecontext(&amp;uc, (<span class="keyword">void</span> (*)(<span class="keyword">void</span>))coroutine_trampoline,</span><br><span class="line">                <span class="number">2</span>, arg.i[<span class="number">0</span>], arg.i[<span class="number">1</span>]);     <span class="comment">//制造一个上下文，设置该上下文的栈空间及相关信息</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* swapcontext() in, longjmp() back out */</span></span><br><span class="line">    <span class="keyword">if</span> (!setjmp(old_env)) &#123;         <span class="comment">//保存当前上下文到old_env中，此时old_env的地址作为co-&gt;base.entry_arg</span></span><br><span class="line">        swapcontext(&amp;old_uc, &amp;uc);   <span class="comment">//切换至uc代表的上下文中，入口函数为coroutine_trampoline，返回点为old_uc中</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> &amp;co-&gt;base;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">void</span> <span class="title">coroutine_trampoline</span><span class="params">(<span class="keyword">int</span> i0, <span class="keyword">int</span> i1)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="keyword">union</span> cc_arg arg;</span><br><span class="line">    CoroutineUContext *self;</span><br><span class="line">    Coroutine *co;</span><br><span class="line"></span><br><span class="line">    arg.i[<span class="number">0</span>] = i0;</span><br><span class="line">    arg.i[<span class="number">1</span>] = i1;</span><br><span class="line">    self = arg.p;</span><br><span class="line">    co = &amp;self-&gt;base;   <span class="comment">//获取了通过coroutine_new创建的coroutine结构</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* Initialize longjmp environment and switch back the caller */</span></span><br><span class="line">    <span class="keyword">if</span> (!setjmp(self-&gt;env)) &#123;   <span class="comment">//保存当前上下文到co（新协程）的env buffer中，由于第一次setjmp返回的是0，则调用下面的longjmp</span></span><br><span class="line">        longjmp(*(jmp_buf *)co-&gt;entry_arg, <span class="number">1</span>); <span class="comment">//此时co-&gt;entry_arg为coroutine_new中的old_env保存点，而value给的是1，则swapcontext不会执行，直接return，qemu_coroutine_create就直接返回了</span></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">while</span> (<span class="literal">true</span>) &#123;</span><br><span class="line">        co-&gt;entry(co-&gt;entry_arg);</span><br><span class="line">        qemu_coroutine_switch(co, co-&gt;caller, COROUTINE_TERMINATE);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>经过create的过程，新创建的co的env保存了coroutine_trampoline中setjmp(self-&gt;env)的上下文。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">qemu_coroutine_enter</span><span class="params">(Coroutine *co, <span class="keyword">void</span> *opaque)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    Coroutine *self = qemu_coroutine_self();   <span class="comment">//获取当前协程的co结构，第一次可认为是主协程的控制信息</span></span><br><span class="line"></span><br><span class="line">    trace_qemu_coroutine_enter(self, co, opaque);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (co-&gt;caller) &#123;</span><br><span class="line">        <span class="built_in">fprintf</span>(<span class="built_in">stderr</span>, <span class="string">"Co-routine re-entered recursively\n"</span>);</span><br><span class="line">        <span class="built_in">abort</span>();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    co-&gt;caller = self;   <span class="comment">//新协程的caller为主线程co</span></span><br><span class="line">    co-&gt;entry_arg = opaque;</span><br><span class="line">    coroutine_swap(self, co);   <span class="comment">//通过swap操作从主协程切换至新创建的co</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//qemu_coroutine_switch 为协程切换的关键函数</span></span><br><span class="line"><span class="function">CoroutineAction <span class="title">qemu_coroutine_switch</span><span class="params">(Coroutine *from_, Coroutine *to_,</span></span></span><br><span class="line"><span class="function"><span class="params">                                      CoroutineAction action)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    CoroutineUContext *from = DO_UPCAST(CoroutineUContext, base, from_);</span><br><span class="line">    CoroutineUContext *to = DO_UPCAST(CoroutineUContext, base, to_);</span><br><span class="line">    CoroutineThreadState *s = coroutine_get_thread_state();</span><br><span class="line">    <span class="keyword">int</span> ret;</span><br><span class="line"></span><br><span class="line">    s-&gt;current = to_;</span><br><span class="line"></span><br><span class="line">    ret = setjmp(from-&gt;env);   <span class="comment">//保存当前的上下文到主协程的env中，相当于主协程的上下文在qemu_coroutine_enter中</span></span><br><span class="line">    <span class="keyword">if</span> (ret == <span class="number">0</span>) &#123;</span><br><span class="line">        longjmp(to-&gt;env, action);  <span class="comment">//跳转至新协程的上下文，新协程的上下文保存点为coroutine_trampoline中的setjmp处，此处action给的是非0，则直接进入co-&gt;entry(co-&gt;entry_arg);执行create时给的entry.</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> ret;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>若co-&gt;entry(co-&gt;entry_arg)中使用qemu_coroutine_yield<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> coroutine_fn <span class="title">qemu_coroutine_yield</span><span class="params">(<span class="keyword">void</span>)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    Coroutine *self = qemu_coroutine_self();</span><br><span class="line">    Coroutine *to = self-&gt;caller;</span><br><span class="line"></span><br><span class="line">    trace_qemu_coroutine_yield(self, to);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (!to) &#123;</span><br><span class="line">        <span class="built_in">fprintf</span>(<span class="built_in">stderr</span>, <span class="string">"Co-routine is yielding to no one\n"</span>);</span><br><span class="line">        <span class="built_in">abort</span>();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    self-&gt;caller = <span class="literal">NULL</span>;</span><br><span class="line">    coroutine_swap(self, to);   <span class="comment">//此处self为新协程，to为主协程</span></span><br><span class="line">&#125;</span><br><span class="line">再次通过coroutine_swap操作来进行切换：</span><br><span class="line"><span class="function">CoroutineAction <span class="title">qemu_coroutine_switch</span><span class="params">(Coroutine *from_, Coroutine *to_,</span></span></span><br><span class="line"><span class="function"><span class="params">                                      CoroutineAction action)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    CoroutineUContext *from = DO_UPCAST(CoroutineUContext, base, from_);</span><br><span class="line">    CoroutineUContext *to = DO_UPCAST(CoroutineUContext, base, to_);</span><br><span class="line">    CoroutineThreadState *s = coroutine_get_thread_state();</span><br><span class="line">    <span class="keyword">int</span> ret;</span><br><span class="line"></span><br><span class="line">    s-&gt;current = to_;</span><br><span class="line"></span><br><span class="line">    ret = setjmp(from-&gt;env);  <span class="comment">//保存当前上下文到from的evn即新协程的env，此处的调用栈为qemu_coroutine_yield的内部</span></span><br><span class="line">    <span class="keyword">if</span> (ret == <span class="number">0</span>) &#123;</span><br><span class="line">        longjmp(to-&gt;env, action); <span class="comment">//切换至主协程的上下文，在上面enter的分析中可以得到，此时主协程的上下文在qemu_coroutine_enter中。</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> ret;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>这样yield处的上下文被保存在新协程的env中，而程序逻辑调回了qemu_coroutine_enter中继续执行，即从qemu_coroutine_enter退出。</p>
+<p>在适当的时机，再次调用qemu_coroutine_enter则会恢复yield处的上下文继续执行。</p>
+<p><img src="http://7j1zal.com1.z0.glb.clouddn.com/qemu-coroutine.PNG" alt=""></p>
+<h2 id="基于ucontext的实现（云风）"><a href="#基于ucontext的实现（云风）" class="headerlink" title="基于ucontext的实现（云风）"></a>基于ucontext的实现（云风）</h2><p><a href="https://github.com/cloudwu/coroutine/" target="_blank" rel="noopener">https://github.com/cloudwu/coroutine/</a></p>
+
+        
+        </div>
+        <footer class="article-footer">
+            <div class="share-container">
+
+
+
+</div>
+
+    <a data-url="http://royhunter.github.io/2016/06/24/qemu-coroutine/" data-id="ck2oe6fol002vxkkvbp45ikqr" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+<script>
+    (function ($) {
+        // Prevent duplicate binding
+        if (typeof(__SHARE_BUTTON_BINDED__) === 'undefined' || !__SHARE_BUTTON_BINDED__) {
+            __SHARE_BUTTON_BINDED__ = true;
+        } else {
+            return;
+        }
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url'),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="fab fa-twitter article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="fab fa-facebook article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="fab fa-pinterest article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                            '<a href="https://plus.google.com/share?url=' + encodedUrl + '" class="fab fa-google article-share-google" target="_blank" title="Google+"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+            
+    
+
+        </footer>
+    </div>
+    
+        
+<nav id="article-nav">
+    
+        <a href="/2016/06/28/qcow2/" id="article-nav-newer" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Newer</strong>
+            <div class="article-nav-title">
+                
+                    qcow2原理详解
+                
+            </div>
+        </a>
+    
+    
+        <a href="/2016/06/14/git/" id="article-nav-older" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Older</strong>
+            <div class="article-nav-title">常用Git命令速查笔记</div>
+        </a>
+    
+</nav>
+
+
+    
+</article>
+
+
+    
+    
+
+</section>
+            
+                
+<aside id="sidebar">
+   
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">recent</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2020/07/12/index/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"></p>
+                            <p class="item-title"><a href="/2020/07/12/index/" class="title">Blog索引</a></p>
+                            <p class="item-date"><time datetime="2020-07-12T13:33:28.000Z" itemprop="datePublished">2020-07-12</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/07/17/ovs02-vxlan/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/07/17/ovs02-vxlan/" class="title">OVS02-VXLAN内核相关实现</a></p>
+                            <p class="item-date"><time datetime="2018-07-17T12:15:34.000Z" itemprop="datePublished">2018-07-17</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/01/10/perf-tunning/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/01/10/perf-tunning/" class="title">datapath性能优化总结</a></p>
+                            <p class="item-date"><time datetime="2018-01-10T13:26:32.000Z" itemprop="datePublished">2018-01-10</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2017/04/18/ovs01/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2017/04/18/ovs01/" class="title">OVS01-OVS基础-安装、配置、Simple Case</a></p>
+                            <p class="item-date"><time datetime="2017-04-18T13:26:32.000Z" itemprop="datePublished">2017-04-18</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2016/08/28/trampolines-for-nested-functions/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Programme/">Programme</a></p>
+                            <p class="item-title"><a href="/2016/08/28/trampolines-for-nested-functions/" class="title">Trampolines for Nested Functions in GCC</a></p>
+                            <p class="item-date"><time datetime="2016-08-28T13:26:32.000Z" itemprop="datePublished">2016-08-28</time></p>
+                        </div>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">categories</h3>
+        <div class="widget">
+            <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Algorithm/">Algorithm</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Container/">Container</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Docker/">Docker</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Hyper-V/">Hyper-V</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/KVM/">KVM</a><span class="category-list-count">22</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Misc/">Misc</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/PROGRAMME/">PROGRAMME</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Programme/">Programme</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Virtualization/">Virtualization</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/go/">go</a><span class="category-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">archives</h3>
+        <div class="widget">
+            <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">July 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">July 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">January 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">April 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">August 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/06/">June 2016</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/05/">May 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/03/">March 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/02/">February 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/01/">January 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/12/">December 2015</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/11/">November 2015</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/08/">August 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/07/">July 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/06/">June 2014</a><span class="archive-list-count">5</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tags</h3>
+        <div class="widget">
+            <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Container/">Container</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Distribute/">Distribute</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/EPT/">EPT</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux-namespace/">Linux namespace</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Network/">Network</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/PROGRAMME/">PROGRAMME</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Programme-Language/">Programme Language</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/QEMU/">QEMU</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Tools/">Tools</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization/">Virtualization</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization-KVM-QEMU/">Virtualization KVM QEMU</a><span class="tag-list-count">9</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/libvirt/">libvirt</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vhost/">vhost</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/virtio/">virtio</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vps-proxy/">vps_proxy</a><span class="tag-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tag cloud</h3>
+        <div class="widget tagcloud">
+            <a href="/tags/Container/" style="font-size: 12.5px;">Container</a> <a href="/tags/Distribute/" style="font-size: 12.5px;">Distribute</a> <a href="/tags/EPT/" style="font-size: 12.5px;">EPT</a> <a href="/tags/Linux-namespace/" style="font-size: 12.5px;">Linux namespace</a> <a href="/tags/Network/" style="font-size: 15px;">Network</a> <a href="/tags/PROGRAMME/" style="font-size: 10px;">PROGRAMME</a> <a href="/tags/Programme-Language/" style="font-size: 10px;">Programme Language</a> <a href="/tags/QEMU/" style="font-size: 12.5px;">QEMU</a> <a href="/tags/Tools/" style="font-size: 12.5px;">Tools</a> <a href="/tags/Virtualization/" style="font-size: 17.5px;">Virtualization</a> <a href="/tags/Virtualization-KVM-QEMU/" style="font-size: 20px;">Virtualization KVM QEMU</a> <a href="/tags/libvirt/" style="font-size: 10px;">libvirt</a> <a href="/tags/vhost/" style="font-size: 10px;">vhost</a> <a href="/tags/virtio/" style="font-size: 17.5px;">virtio</a> <a href="/tags/vps-proxy/" style="font-size: 10px;">vps_proxy</a>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">links</h3>
+        <div class="widget">
+            <ul>
+                
+                    <li>
+                        <a href="http://hexo.io">Hexo</a>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+
+    
+    <div id="toTop" class="fas fa-angle-up"></div>
+</aside>
+
+            
+        </div>
+        <footer id="footer">
+    <div class="outer">
+        <div id="footer-info" class="inner">
+            &copy; 2019 John Doe<br>
+            Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>. Theme by <a href="http://github.com/ppoffice">PPOffice</a>
+        </div>
+    </div>
+</footer>
+        
+
+
+    
+        <script src="/libs/lightgallery/js/lightgallery.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-thumbnail.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-pager.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-autoplay.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-fullscreen.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-zoom.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-hash.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-share.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-video.min.js"></script>
+    
+    
+        <script src="/libs/justified-gallery/jquery.justifiedGallery.min.js"></script>
+    
+    
+
+
+
+<!-- Custom Scripts -->
+<script src="/js/main.js"></script>
+
+    </div>
+</body>
+</html>

@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <meta charset="utf-8">
+    
+    <title>Container的内核技术基础：Namespace | RoyLuo&#39;s Notes</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="description" content="容器的最重要的特性之一是资源的隔离性，Linux内核为Container的实现提供了比较重要的技术基础之一： Namespace技术。Namespace这个词我们并不陌生，最常见的就是编程语言中的namespace概念，主要是命名空间或者package管理空间等。我的理解就是提供了一个新的环境或世界，该环境或世界提供了与其它环境或世界隔离，并拥有自我内部独立的运行规则。(漫威的漫画中经常有平行世界">
+<meta name="keywords" content="Linux namespace">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Container的内核技术基础：Namespace">
+<meta property="og:url" content="http://royhunter.github.io/2015/12/07/container-namespace/index.html">
+<meta property="og:site_name" content="RoyLuo&#39;s Notes">
+<meta property="og:description" content="容器的最重要的特性之一是资源的隔离性，Linux内核为Container的实现提供了比较重要的技术基础之一： Namespace技术。Namespace这个词我们并不陌生，最常见的就是编程语言中的namespace概念，主要是命名空间或者package管理空间等。我的理解就是提供了一个新的环境或世界，该环境或世界提供了与其它环境或世界隔离，并拥有自我内部独立的运行规则。(漫威的漫画中经常有平行世界">
+<meta property="og:locale" content="en">
+<meta property="og:image" content="http://7xoxkz.com1.z0.glb.clouddn.com/ns_2.png">
+<meta property="og:updated_time" content="2016-06-25T04:11:08.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Container的内核技术基础：Namespace">
+<meta name="twitter:description" content="容器的最重要的特性之一是资源的隔离性，Linux内核为Container的实现提供了比较重要的技术基础之一： Namespace技术。Namespace这个词我们并不陌生，最常见的就是编程语言中的namespace概念，主要是命名空间或者package管理空间等。我的理解就是提供了一个新的环境或世界，该环境或世界提供了与其它环境或世界隔离，并拥有自我内部独立的运行规则。(漫威的漫画中经常有平行世界">
+<meta name="twitter:image" content="http://7xoxkz.com1.z0.glb.clouddn.com/ns_2.png">
+    
+
+    
+        <link rel="alternate" href="atom.xml" title="RoyLuo&#39;s Notes" type="application/atom+xml" />
+    
+
+    
+
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fontawesome.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-brands.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-solid.min.css">
+    <link rel="stylesheet" href="/libs/open-sans/styles.css">
+    <link rel="stylesheet" href="/libs/source-code-pro/styles.css">
+
+    <link rel="stylesheet" href="/css/style.css">
+
+    <script src="/libs/jquery/2.1.3/jquery.min.js"></script>
+    
+    
+        <link rel="stylesheet" href="/libs/lightgallery/css/lightgallery.min.css">
+    
+    
+        <link rel="stylesheet" href="/libs/justified-gallery/justifiedGallery.min.css">
+    
+    
+    
+    
+
+
+</head>
+
+<body>
+    <div id="container">
+        <header id="header">
+    <div id="header-main" class="header-inner">
+        <div class="outer">
+            <a href="/" id="logo">
+                <i class="logo"></i>
+                <span class="site-title">RoyLuo&#39;s Notes</span>
+            </a>
+            <nav id="main-nav">
+                
+                    <a class="main-nav-link" href="/.">Home</a>
+                
+                    <a class="main-nav-link" href="/archives">Archives</a>
+                
+                    <a class="main-nav-link" href="/categories">Categories</a>
+                
+                    <a class="main-nav-link" href="/tags">Tags</a>
+                
+                    <a class="main-nav-link" href="/proj">Projects</a>
+                
+                    <a class="main-nav-link" href="/book">Books</a>
+                
+                    <a class="main-nav-link" href="/about">About</a>
+                
+            </nav>
+            
+                
+                <nav id="sub-nav">
+                    <div class="profile" id="profile-nav">
+                        <a id="profile-anchor" href="javascript:;">
+                            <img class="avatar" src="/css/images/image_y.png" />
+                            <i class="fas fa-caret-down"></i>
+                        </a>
+                    </div>
+                </nav>
+            
+            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+        <button type="submit" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" placeholder="Type something..." />
+            <span class="ins-close ins-selectable"><i class="fas fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script>
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: 'Posts',
+            PAGES: 'Pages',
+            CATEGORIES: 'Categories',
+            TAGS: 'Tags',
+            UNTITLED: '(Untitled)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+<script src="/js/insight.js"></script>
+
+</div>
+        </div>
+    </div>
+    <div id="main-nav-mobile" class="header-sub header-inner">
+        <table class="menu outer">
+            <tr>
+                
+                    <td><a class="main-nav-link" href="/.">Home</a></td>
+                
+                    <td><a class="main-nav-link" href="/archives">Archives</a></td>
+                
+                    <td><a class="main-nav-link" href="/categories">Categories</a></td>
+                
+                    <td><a class="main-nav-link" href="/tags">Tags</a></td>
+                
+                    <td><a class="main-nav-link" href="/proj">Projects</a></td>
+                
+                    <td><a class="main-nav-link" href="/book">Books</a></td>
+                
+                    <td><a class="main-nav-link" href="/about">About</a></td>
+                
+                <td>
+                    
+    <div class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+    </div>
+
+                </td>
+            </tr>
+        </table>
+    </div>
+</header>
+
+        <div class="outer">
+            
+                
+
+<aside id="profile" class="profile-fixed">
+    <div class="inner profile-inner">
+        <div class="base-info profile-block">
+            <img id="avatar" src="/css/images/image_y.png" />
+            <h2 id="name">Roy Luo</h2>
+            <h3 id="title">Designer &amp; Developer</h3>
+            <span id="location"><i class="fas fa-map-marker-alt" style="padding-right: 5px"></i>Beijing, China</span>
+            <a id="follow" target="_blank" href="https://github.com/royhunter/">FOLLOW</a>
+        </div>
+        <div class="article-info profile-block">
+            <div class="article-info-block">
+                43
+                <span>posts</span>
+            </div>
+            <div class="article-info-block">
+                15
+                <span>tags</span>
+            </div>
+        </div>
+        
+        <div class="profile-block social-links">
+            <table>
+                <tr>
+                    
+                    
+                    <td>
+                        <a href="http://github.com/royhunter/" target="_blank" title="github" class=tooltip>
+                            <i class="fab fa-github"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://twitter.com/RoyLuoye" target="_blank" title="twitter" class=tooltip>
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://www.facebook/roy.luo.3367" target="_blank" title="facebook" class=tooltip>
+                            <i class="fab fa-facebook"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://cn.linkedin.com/in/royluoye" target="_blank" title="linkedin" class=tooltip>
+                            <i class="fab fa-linkedin"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="/atom.xml" target="_blank" title="rss" class=tooltip>
+                            <i class="fab fa-rss"></i>
+                        </a>
+                    </td>
+                    
+                </tr>
+            </table>
+        </div>
+        
+    </div>
+</aside>
+
+            
+            <section id="main"><article id="post-container-namespace" class="article article-type-post" itemscope itemprop="blogPost">
+    <div class="article-inner">
+        
+            
+	
+		<img src="http://7xoxkz.com1.z0.glb.clouddn.com/ns_2.png" class="article-banner" />
+	
+
+
+
+        
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+            Container的内核技术基础：Namespace
+        </h1>
+    
+
+                
+                    <div class="article-meta">
+                        
+    <div class="article-date">
+        <i class="fas fa-calendar-alt"></i>
+        <a href="/2015/12/07/container-namespace/">
+            <time datetime="2015-12-07T13:49:00.000Z" itemprop="datePublished">2015-12-07</time>
+        </a>
+    </div>
+
+
+                        
+    <div class="article-category">
+    	<i class="fas fa-folder"></i>
+        <a class="article-category-link" href="/categories/Docker/">Docker</a>
+    </div>
+
+                        
+    <div class="article-tag">
+        <i class="fas fa-tag"></i>
+        <a class="tag-link" href="/tags/Linux-namespace/">Linux namespace</a>
+    </div>
+
+                    </div>
+                
+            </header>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+        
+            
+            <p>容器的最重要的特性之一是资源的隔离性，Linux内核为Container的实现提供了比较重要的技术基础之一： Namespace技术。<br>Namespace这个词我们并不陌生，最常见的就是编程语言中的namespace概念，主要是命名空间或者package管理空间等。我的理解就是提供了一个新的环境或世界，该环境或世界提供了与其它环境或世界隔离，并拥有自我内部独立的运行规则。(漫威的漫画中经常有平行世界的概念，人物的发展分叉了，两个时空没有关系。。。扯远了）<br><a id="more"></a> </p>
+<h2 id="什么是Namespace"><a href="#什么是Namespace" class="headerlink" title="什么是Namespace"></a>什么是Namespace</h2><hr>
+<p>参考<a href="http://man7.org/linux/man-pages/man7/namespaces.7.html" target="_blank" rel="noopener">http://man7.org/linux/man-pages/man7/namespaces.7.html</a>：</p>
+<blockquote>
+<p> A namespace wraps a global system resource in an abstraction that makes it appear to the processes within the namespace that they have their own isolated instance of the global resource. Changes to the global resource are visible to other processes that are members of the namespace, but are invisible to other processes. One use of namespaces is to implement containers.</p>
+</blockquote>
+<p>Namespace是一种将全局系统资源的抽象成各自隔离的namespace中进程可见的一种实例化资源。我的理解就是资源进行实例化，申请者拥有各自的实例化对象，即拥有各自独立的内核系统。</p>
+<p>Linux 支持6种类型的namespace：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">Namespace      Constant        Isolates</span><br><span class="line">  IPC         CLONE_NEWIPC    System V IPC, POSIX消息队列</span><br><span class="line">  Network     CLONE_NEWNET    网络设备端口等</span><br><span class="line">  Mount       CLONE_NEWNS     Mount points (挂载点)</span><br><span class="line">  PID         CLONE_NEWPID    Process IDs (进程PID)</span><br><span class="line">  User        CLONE_NEWUSER   User and group IDs (UID,GID)</span><br><span class="line">  UTS         CLONE_NEWUTS    Hostname and NIS domain name</span><br></pre></td></tr></table></figure>
+<p>Namespace API:</p>
+<pre><code>clone()     创建一个进程,可指定namespace的类型
+setns()     允许调用的进程加入一个指定的namespace
+unshare()   允许调用的进程脱离一个指定的namespace
+</code></pre><p>这篇文章就CLONE_NEWPID（简单好理解一些）为主要例子来分析下Namespace的特性及其Linux内核的实现。</p>
+<h2 id="Clone"><a href="#Clone" class="headerlink" title="Clone"></a>Clone</h2><hr>
+<p>从namespace的API:clone入手：</p>
+<pre><code>int clone(int (*fn)(void *), void *child_stack,  int flags, void *arg, ...);
+</code></pre><p>clone需要一个子进程的入口函数，一个栈空间，一些flag，和参数信息。</p>
+<h3 id="普通场景"><a href="#普通场景" class="headerlink" title="普通场景"></a>普通场景</h3><pre><code>#define _GNU_SOURCE
+#include &lt;sched.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;sys/wait.h&gt;
+#include &lt;unistd.h&gt;
+
+static char child_stack[100000];
+
+static int child_fn() {
+  printf(&quot;PID: %ld\n&quot;, (long)getpid());
+  printf(&quot;Parent PID: %ld\n&quot;, (long)getppid());
+  execv(container_args[0], container_args);
+  return 0;
+}
+
+int main() {
+  pid_t child_pid = clone(child_fn, child_stack+100000, SIGCHLD, NULL);
+  printf(&quot;clone() = %ld\n&quot;, (long)child_pid);
+
+  waitpid(child_pid, NULL, 0);
+  printf(&quot;back to main()\n&quot;);
+  return 0;
+}
+</code></pre><hr>
+<pre><code>root@royluo:~/work/container# gcc -o ns ns.c
+root@royluo:~/work/container# ./ns
+return child pid = 25984   &lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;clone返回的子进程PID
+PID: 25984   &lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;子进程PID
+Parent PID: 25983    &lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;父进程PID
+root@royluo:~/work/container# exit
+exit
+back to main()
+root@royluo:~/work/container#    
+</code></pre><p>父进程调用clone创建了一个子进程，并输出了父子进程ID（25983， 25984)，这是没有创建新的namespace的情况。</p>
+<h3 id="CLONE-NEWPID场景"><a href="#CLONE-NEWPID场景" class="headerlink" title="CLONE_NEWPID场景"></a>CLONE_NEWPID场景</h3><pre><code>static int child_fn() {
+  printf(&quot;PID: %ld\n&quot;, (long)getpid());
+  printf(&quot;Parent PID: %ld\n&quot;, (long)getppid());
+   execv(container_args[0], container_args);
+  return 0;
+}
+
+int main() {
+  pid_t child_pid = clone(child_fn, child_stack+100000,
+    CLONE_NEWPID | SIGCHLD, NULL);   //CLONE_NEWPID
+  printf(&quot;clone() = %ld\n&quot;, (long)child_pid);
+
+  waitpid(child_pid, NULL, 0);
+  printf(&quot;back to main()\n&quot;);
+  return 0;
+}
+</code></pre><hr>
+<pre><code>root@royluo:~/work/container# ./ns
+return child pid = 26013  &lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;clone返回的子进程PID
+PID: 1   &lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;  子进程PID
+Parent PID: 0   &lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt; 父进程PID
+root@royluo:~/work/container# exit
+exit
+back to main()
+root@royluo:~/work/container# 
+</code></pre><p>但在系统ps能看到该子进程</p>
+<pre><code>root@royluo:~# ps aux|grep 26013
+root     26013  0.0  0.4  21112  2012 pts/3    S+   07:25   0:00 /bin/bash
+root     26110  0.0  0.1  11740   932 pts/0    S+   07:26   0:00 grep --color=auto 26013
+root@royluo:~# 
+</code></pre><p>显然CLONE_NEWPID在作怪。由于新建了PID的namespace，子进程就会在一个新的PID namespace里另起炉灶，成为了PID为1的进程，而父进程ID为0，表示不存在。<br>在Unix系统中，PID为1的进程很特殊，一般都是init进程，系统中其他进程都是由init继承而来，扮演终极父进程的角色。失去了父进程的子进程就都会以init作为它们的父进程。所以在新的namespace里由于PID的隔离性，导致了子进程从PID为1重新开始。其无法看到父进程的所有信息，但父进程却可以看到子进程。<br>下图将父子进程和其各自的namespace的关系陈述的很清楚，父进程在一个namespace，子进程在一个新的namespace，子进程所属父进程的namespace，而在子进程的namespace中是独自拥有的namespace。<br><img src="http://7xoxkz.com1.z0.glb.clouddn.com/ns_1.PNG" alt=""></p>
+<h2 id="内核实现"><a href="#内核实现" class="headerlink" title="内核实现"></a>内核实现</h2><hr>
+<p>在内核中每个进程都有一个struct task_struct 结构来表示，其中struct nsproxy 代表关联的namespace<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">task_struct</span> &#123;</span></span><br><span class="line">	...</span><br><span class="line">	<span class="comment">/* open file information */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">files_struct</span> *<span class="title">files</span>;</span></span><br><span class="line">	<span class="comment">/* namespaces */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">nsproxy</span> *<span class="title">nsproxy</span>;</span>   &lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;<span class="keyword">namespace</span>信息结构</span><br><span class="line">	<span class="comment">/* signal handlers */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">signal_struct</span> *<span class="title">signal</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">sighand_struct</span> *<span class="title">sighand</span>;</span></span><br><span class="line">	...</span><br><span class="line">&#125;</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">nsproxy</span> &#123;</span></span><br><span class="line">	<span class="keyword">atomic_t</span> count;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">uts_namespace</span> *<span class="title">uts_ns</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">ipc_namespace</span> *<span class="title">ipc_ns</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">mnt_namespace</span> *<span class="title">mnt_ns</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">pid_namespace</span> *<span class="title">pid_ns_for_children</span>;</span>  &lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;PID <span class="keyword">namespace</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">net</span> 	     *<span class="title">net_ns</span>;</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure></p>
+<p>Clone是一个系统调用，在Linux内核中最终会调用do_fork():</p>
+<pre><code>do_fork()
+    copy_process()
+        p = dup_task_struct(current); //创建子进程的task_struct，并复制父进程的一些空间信息
+        copy_namespaces() //拷贝namespace信息
+</code></pre><hr>
+<pre><code>int copy_namespaces(unsigned long flags, struct task_struct *tsk)
+{
+    //如果没有设上namespace相关的flag则直接返回，表示复用父进程的namespace
+    if (likely(!(flags &amp; (CLONE_NEWNS | CLONE_NEWUTS | CLONE_NEWIPC |
+              CLONE_NEWPID | CLONE_NEWNET)))) {
+        get_nsproxy(old_ns);
+        return 0;
+    }
+    ......
+    //需要创建新的namespace
+    new_ns = create_new_namespaces(flags, tsk, user_ns, tsk-&gt;fs);
+    if (IS_ERR(new_ns))
+        return  PTR_ERR(new_ns);
+    tsk-&gt;nsproxy = new_ns;
+    return 0;
+}
+static struct nsproxy *create_new_namespaces(unsigned long flags,
+    struct task_struct *tsk, struct user_namespace *user_ns,
+    struct fs_struct *new_fs)
+{
+    new_nsp = create_nsproxy();
+    ...
+    copy_mnt_ns() //创建新的Mount points Namespace
+    ...
+    copy_utsname() //创建新的Hostname and NIS domain name Namespace
+    ...
+    copy_ipcs()      //创建新的System V IPC, POSIX message queues Namespace
+    ...
+    //重点关注创建新的Process IDs Namespace
+    new_nsp-&gt;pid_ns_for_children =
+    copy_pid_ns(flags, user_ns, tsk-&gt;nsproxy-&gt;pid_ns_for_children);
+    ...
+    copy_net_ns()    //创建新的Network devices, stacks, ports, etc. Namespace
+    ...
+}
+</code></pre><p>最终调用create_pid_namespace：</p>
+<pre><code>static struct pid_namespace *create_pid_namespace(struct user_namespace *user_ns,
+    struct pid_namespace *parent_pid_ns)
+{
+    ...
+    //子进程的level总比父进程大1，可区分是否在一个namespace里
+    unsigned int level = parent_pid_ns-&gt;level + 1; 
+    ...
+    ns = kmem_cache_zalloc(pid_ns_cachep, GFP_KERNEL);
+    ns-&gt;pidmap[0].page = kzalloc(PAGE_SIZE, GFP_KERNEL);
+    ...
+    ns-&gt;level = level;
+    ns-&gt;parent = get_pid_ns(parent_pid_ns);
+    ns-&gt;user_ns = get_user_ns(user_ns);
+    ...
+    //初始化PID Map表，这是PID另起炉灶的基础，该子进程第一个申请，也就占用了1号PID。
+    set_bit(0, ns-&gt;pidmap[0].page);
+    atomic_set(&amp;ns-&gt;pidmap[0].nr_free, BITS_PER_PAGE - 1);
+
+    for (i = 1; i &lt; PIDMAP_ENTRIES; i++)
+        atomic_set(&amp;ns-&gt;pidmap[i].nr_free, BITS_PER_PAGE);
+    ...
+}
+</code></pre><p>走到这里可以看到PID的分配空间已经和父进程隔离开来，甚至和父进程所在的PID Namespace隔离开来。该1号PID的进程的子进程的PID将在这个Namespace中”繁衍“。</p>
+<p>REF:</p>
+<ol>
+<li><a href="http://man7.org/linux/man-pages/man7/namespaces.7.html" target="_blank" rel="noopener">http://man7.org/linux/man-pages/man7/namespaces.7.html</a></li>
+<li><a href="http://www.toptal.com/linux/separation-anxiety-isolating-your-system-with-linux-namespaces" target="_blank" rel="noopener">http://www.toptal.com/linux/separation-anxiety-isolating-your-system-with-linux-namespaces</a></li>
+</ol>
+
+        
+        </div>
+        <footer class="article-footer">
+            <div class="share-container">
+
+
+
+</div>
+
+    <a data-url="http://royhunter.github.io/2015/12/07/container-namespace/" data-id="ck2oe6fnl000ixkkvk6km4lku" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+<script>
+    (function ($) {
+        // Prevent duplicate binding
+        if (typeof(__SHARE_BUTTON_BINDED__) === 'undefined' || !__SHARE_BUTTON_BINDED__) {
+            __SHARE_BUTTON_BINDED__ = true;
+        } else {
+            return;
+        }
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url'),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="fab fa-twitter article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="fab fa-facebook article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="fab fa-pinterest article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                            '<a href="https://plus.google.com/share?url=' + encodedUrl + '" class="fab fa-google article-share-google" target="_blank" title="Google+"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+            
+    
+
+        </footer>
+    </div>
+    
+        
+<nav id="article-nav">
+    
+        <a href="/2015/12/13/netns/" id="article-nav-newer" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Newer</strong>
+            <div class="article-nav-title">
+                
+                    Network Namespace
+                
+            </div>
+        </a>
+    
+    
+        <a href="/2015/12/06/fugfw/" id="article-nav-older" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Older</strong>
+            <div class="article-nav-title">科学上网：Digital Ocean + Shadowsocks</div>
+        </a>
+    
+</nav>
+
+
+    
+</article>
+
+
+    
+    
+
+</section>
+            
+                
+<aside id="sidebar">
+   
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">recent</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2020/07/12/index/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"></p>
+                            <p class="item-title"><a href="/2020/07/12/index/" class="title">Blog索引</a></p>
+                            <p class="item-date"><time datetime="2020-07-12T13:33:28.000Z" itemprop="datePublished">2020-07-12</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/07/17/ovs02-vxlan/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/07/17/ovs02-vxlan/" class="title">OVS02-VXLAN内核相关实现</a></p>
+                            <p class="item-date"><time datetime="2018-07-17T12:15:34.000Z" itemprop="datePublished">2018-07-17</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/01/10/perf-tunning/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/01/10/perf-tunning/" class="title">datapath性能优化总结</a></p>
+                            <p class="item-date"><time datetime="2018-01-10T13:26:32.000Z" itemprop="datePublished">2018-01-10</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2017/04/18/ovs01/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2017/04/18/ovs01/" class="title">OVS01-OVS基础-安装、配置、Simple Case</a></p>
+                            <p class="item-date"><time datetime="2017-04-18T13:26:32.000Z" itemprop="datePublished">2017-04-18</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2016/08/28/trampolines-for-nested-functions/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Programme/">Programme</a></p>
+                            <p class="item-title"><a href="/2016/08/28/trampolines-for-nested-functions/" class="title">Trampolines for Nested Functions in GCC</a></p>
+                            <p class="item-date"><time datetime="2016-08-28T13:26:32.000Z" itemprop="datePublished">2016-08-28</time></p>
+                        </div>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">categories</h3>
+        <div class="widget">
+            <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Algorithm/">Algorithm</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Container/">Container</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Docker/">Docker</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Hyper-V/">Hyper-V</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/KVM/">KVM</a><span class="category-list-count">22</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Misc/">Misc</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/PROGRAMME/">PROGRAMME</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Programme/">Programme</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Virtualization/">Virtualization</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/go/">go</a><span class="category-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">archives</h3>
+        <div class="widget">
+            <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">July 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">July 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">January 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">April 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">August 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/06/">June 2016</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/05/">May 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/03/">March 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/02/">February 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/01/">January 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/12/">December 2015</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/11/">November 2015</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/08/">August 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/07/">July 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/06/">June 2014</a><span class="archive-list-count">5</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tags</h3>
+        <div class="widget">
+            <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Container/">Container</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Distribute/">Distribute</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/EPT/">EPT</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux-namespace/">Linux namespace</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Network/">Network</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/PROGRAMME/">PROGRAMME</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Programme-Language/">Programme Language</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/QEMU/">QEMU</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Tools/">Tools</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization/">Virtualization</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization-KVM-QEMU/">Virtualization KVM QEMU</a><span class="tag-list-count">9</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/libvirt/">libvirt</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vhost/">vhost</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/virtio/">virtio</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vps-proxy/">vps_proxy</a><span class="tag-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tag cloud</h3>
+        <div class="widget tagcloud">
+            <a href="/tags/Container/" style="font-size: 12.5px;">Container</a> <a href="/tags/Distribute/" style="font-size: 12.5px;">Distribute</a> <a href="/tags/EPT/" style="font-size: 12.5px;">EPT</a> <a href="/tags/Linux-namespace/" style="font-size: 12.5px;">Linux namespace</a> <a href="/tags/Network/" style="font-size: 15px;">Network</a> <a href="/tags/PROGRAMME/" style="font-size: 10px;">PROGRAMME</a> <a href="/tags/Programme-Language/" style="font-size: 10px;">Programme Language</a> <a href="/tags/QEMU/" style="font-size: 12.5px;">QEMU</a> <a href="/tags/Tools/" style="font-size: 12.5px;">Tools</a> <a href="/tags/Virtualization/" style="font-size: 17.5px;">Virtualization</a> <a href="/tags/Virtualization-KVM-QEMU/" style="font-size: 20px;">Virtualization KVM QEMU</a> <a href="/tags/libvirt/" style="font-size: 10px;">libvirt</a> <a href="/tags/vhost/" style="font-size: 10px;">vhost</a> <a href="/tags/virtio/" style="font-size: 17.5px;">virtio</a> <a href="/tags/vps-proxy/" style="font-size: 10px;">vps_proxy</a>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">links</h3>
+        <div class="widget">
+            <ul>
+                
+                    <li>
+                        <a href="http://hexo.io">Hexo</a>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+
+    
+    <div id="toTop" class="fas fa-angle-up"></div>
+</aside>
+
+            
+        </div>
+        <footer id="footer">
+    <div class="outer">
+        <div id="footer-info" class="inner">
+            &copy; 2019 John Doe<br>
+            Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>. Theme by <a href="http://github.com/ppoffice">PPOffice</a>
+        </div>
+    </div>
+</footer>
+        
+
+
+    
+        <script src="/libs/lightgallery/js/lightgallery.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-thumbnail.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-pager.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-autoplay.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-fullscreen.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-zoom.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-hash.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-share.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-video.min.js"></script>
+    
+    
+        <script src="/libs/justified-gallery/jquery.justifiedGallery.min.js"></script>
+    
+    
+
+
+
+<!-- Custom Scripts -->
+<script src="/js/main.js"></script>
+
+    </div>
+</body>
+</html>

@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <meta charset="utf-8">
+    
+    <title>Virtio----Vring Introduce | RoyLuo&#39;s Notes</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="description" content="KVM上设备I/O虚拟化的性能问题长期存在，此时由Rusty Russell开发的virtio引起了开发者们的注意并逐渐被KVM等虚拟化平台接纳并作为了其I/O虚拟化最主要的一个通用框架。 Virtio使用virtqueue来实现其I/O机制，每个virtqueue就是一个承载大量数据的queue。vring是virtqueue的具体实现方式。">
+<meta name="keywords" content="virtio">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Virtio----Vring Introduce">
+<meta property="og:url" content="http://royhunter.github.io/2014/08/08/virtio-virtqueue/index.html">
+<meta property="og:site_name" content="RoyLuo&#39;s Notes">
+<meta property="og:description" content="KVM上设备I/O虚拟化的性能问题长期存在，此时由Rusty Russell开发的virtio引起了开发者们的注意并逐渐被KVM等虚拟化平台接纳并作为了其I/O虚拟化最主要的一个通用框架。 Virtio使用virtqueue来实现其I/O机制，每个virtqueue就是一个承载大量数据的queue。vring是virtqueue的具体实现方式。">
+<meta property="og:locale" content="en">
+<meta property="og:image" content="http://7lrywd.com1.z0.glb.clouddn.com/2.PNG">
+<meta property="og:image" content="http://7lrywd.com1.z0.glb.clouddn.com/3.png">
+<meta property="og:image" content="http://7lrywd.com1.z0.glb.clouddn.com/4.PNG">
+<meta property="og:updated_time" content="2016-06-25T04:03:12.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Virtio----Vring Introduce">
+<meta name="twitter:description" content="KVM上设备I/O虚拟化的性能问题长期存在，此时由Rusty Russell开发的virtio引起了开发者们的注意并逐渐被KVM等虚拟化平台接纳并作为了其I/O虚拟化最主要的一个通用框架。 Virtio使用virtqueue来实现其I/O机制，每个virtqueue就是一个承载大量数据的queue。vring是virtqueue的具体实现方式。">
+<meta name="twitter:image" content="http://7lrywd.com1.z0.glb.clouddn.com/2.PNG">
+    
+
+    
+        <link rel="alternate" href="atom.xml" title="RoyLuo&#39;s Notes" type="application/atom+xml" />
+    
+
+    
+
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fontawesome.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-brands.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-solid.min.css">
+    <link rel="stylesheet" href="/libs/open-sans/styles.css">
+    <link rel="stylesheet" href="/libs/source-code-pro/styles.css">
+
+    <link rel="stylesheet" href="/css/style.css">
+
+    <script src="/libs/jquery/2.1.3/jquery.min.js"></script>
+    
+    
+        <link rel="stylesheet" href="/libs/lightgallery/css/lightgallery.min.css">
+    
+    
+        <link rel="stylesheet" href="/libs/justified-gallery/justifiedGallery.min.css">
+    
+    
+    
+    
+
+
+</head>
+
+<body>
+    <div id="container">
+        <header id="header">
+    <div id="header-main" class="header-inner">
+        <div class="outer">
+            <a href="/" id="logo">
+                <i class="logo"></i>
+                <span class="site-title">RoyLuo&#39;s Notes</span>
+            </a>
+            <nav id="main-nav">
+                
+                    <a class="main-nav-link" href="/.">Home</a>
+                
+                    <a class="main-nav-link" href="/archives">Archives</a>
+                
+                    <a class="main-nav-link" href="/categories">Categories</a>
+                
+                    <a class="main-nav-link" href="/tags">Tags</a>
+                
+                    <a class="main-nav-link" href="/proj">Projects</a>
+                
+                    <a class="main-nav-link" href="/book">Books</a>
+                
+                    <a class="main-nav-link" href="/about">About</a>
+                
+            </nav>
+            
+                
+                <nav id="sub-nav">
+                    <div class="profile" id="profile-nav">
+                        <a id="profile-anchor" href="javascript:;">
+                            <img class="avatar" src="/css/images/image_y.png" />
+                            <i class="fas fa-caret-down"></i>
+                        </a>
+                    </div>
+                </nav>
+            
+            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+        <button type="submit" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" placeholder="Type something..." />
+            <span class="ins-close ins-selectable"><i class="fas fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script>
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: 'Posts',
+            PAGES: 'Pages',
+            CATEGORIES: 'Categories',
+            TAGS: 'Tags',
+            UNTITLED: '(Untitled)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+<script src="/js/insight.js"></script>
+
+</div>
+        </div>
+    </div>
+    <div id="main-nav-mobile" class="header-sub header-inner">
+        <table class="menu outer">
+            <tr>
+                
+                    <td><a class="main-nav-link" href="/.">Home</a></td>
+                
+                    <td><a class="main-nav-link" href="/archives">Archives</a></td>
+                
+                    <td><a class="main-nav-link" href="/categories">Categories</a></td>
+                
+                    <td><a class="main-nav-link" href="/tags">Tags</a></td>
+                
+                    <td><a class="main-nav-link" href="/proj">Projects</a></td>
+                
+                    <td><a class="main-nav-link" href="/book">Books</a></td>
+                
+                    <td><a class="main-nav-link" href="/about">About</a></td>
+                
+                <td>
+                    
+    <div class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+    </div>
+
+                </td>
+            </tr>
+        </table>
+    </div>
+</header>
+
+        <div class="outer">
+            
+                
+
+<aside id="profile" class="profile-fixed">
+    <div class="inner profile-inner">
+        <div class="base-info profile-block">
+            <img id="avatar" src="/css/images/image_y.png" />
+            <h2 id="name">Roy Luo</h2>
+            <h3 id="title">Designer &amp; Developer</h3>
+            <span id="location"><i class="fas fa-map-marker-alt" style="padding-right: 5px"></i>Beijing, China</span>
+            <a id="follow" target="_blank" href="https://github.com/royhunter/">FOLLOW</a>
+        </div>
+        <div class="article-info profile-block">
+            <div class="article-info-block">
+                43
+                <span>posts</span>
+            </div>
+            <div class="article-info-block">
+                15
+                <span>tags</span>
+            </div>
+        </div>
+        
+        <div class="profile-block social-links">
+            <table>
+                <tr>
+                    
+                    
+                    <td>
+                        <a href="http://github.com/royhunter/" target="_blank" title="github" class=tooltip>
+                            <i class="fab fa-github"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://twitter.com/RoyLuoye" target="_blank" title="twitter" class=tooltip>
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://www.facebook/roy.luo.3367" target="_blank" title="facebook" class=tooltip>
+                            <i class="fab fa-facebook"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://cn.linkedin.com/in/royluoye" target="_blank" title="linkedin" class=tooltip>
+                            <i class="fab fa-linkedin"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="/atom.xml" target="_blank" title="rss" class=tooltip>
+                            <i class="fab fa-rss"></i>
+                        </a>
+                    </td>
+                    
+                </tr>
+            </table>
+        </div>
+        
+    </div>
+</aside>
+
+            
+            <section id="main"><article id="post-virtio-virtqueue" class="article article-type-post" itemscope itemprop="blogPost">
+    <div class="article-inner">
+        
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+            Virtio----Vring Introduce
+        </h1>
+    
+
+                
+                    <div class="article-meta">
+                        
+    <div class="article-date">
+        <i class="fas fa-calendar-alt"></i>
+        <a href="/2014/08/08/virtio-virtqueue/">
+            <time datetime="2014-08-08T12:25:37.000Z" itemprop="datePublished">2014-08-08</time>
+        </a>
+    </div>
+
+
+                        
+    <div class="article-category">
+    	<i class="fas fa-folder"></i>
+        <a class="article-category-link" href="/categories/KVM/">KVM</a>
+    </div>
+
+                        
+    <div class="article-tag">
+        <i class="fas fa-tag"></i>
+        <a class="tag-link" href="/tags/virtio/">virtio</a>
+    </div>
+
+                    </div>
+                
+            </header>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+        
+            
+            <p>KVM上设备I/O虚拟化的性能问题长期存在，此时由Rusty Russell开发的virtio引起了开发者们的注意并逐渐被KVM等虚拟化平台接纳并作为了其I/O虚拟化最主要的一个通用框架。</p>
+<p>Virtio使用virtqueue来实现其I/O机制，每个virtqueue就是一个承载大量数据的queue。vring是virtqueue的具体实现方式。</p>
+<a id="more"></a>
+<h2 id="Virtqueue：传输层的抽象"><a href="#Virtqueue：传输层的抽象" class="headerlink" title="Virtqueue：传输层的抽象"></a>Virtqueue：传输层的抽象</h2><p>每个设备拥有多个virtqueue用于大块数据的传输。virtqueue是一个简单的队列，Guest把buffers插入其中，每个buffer 都是一个分散-聚集数组。驱动调用find_vqs()来创建一个与queue关联的结构体。virtqueue的数目根据设备的不同而不同，比如block设备有一个virtqueue,network设备有2个virtqueue,一个用于发送数据包，一个用于接收数据包。</p>
+<p>在virtio设备创建过程中，形成的数据结构如图所示：</p>
+<p><img src="http://7lrywd.com1.z0.glb.clouddn.com/2.PNG" alt=""></p>
+<p>从图中可以看出，virtio-netdev关联了两个virtqueue，包括一个send queue和一个receive queue，而具体的queue的实现由vring来承载。</p>
+<p>针对 virtqueue 的操作包括：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">virtqueue_add_buf</span><span class="params">( struct virtqueue *_vq, struct scatterlist sg[], <span class="keyword">unsigned</span> <span class="keyword">int</span> out, <span class="keyword">unsigned</span> <span class="keyword">int</span> in, <span class="keyword">void</span> *data, <span class="keyword">gfp_t</span> gfp)</span></span></span><br></pre></td></tr></table></figure>
+<p>add_buf()用于向queue中添加一个新的buffer，参数data是一个非空的令牌，用于识别 buffer，当buffer内容被消耗后，data会返回。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">virtqueue_kick()</span><br></pre></td></tr></table></figure>
+<p>Guest 通知 host 单个或者多个 buffer 已经添加到 queue 中,调用 virtqueue_notify()，notify 函数会向 queue notify(VIRTIO_PCI_QUEUE_NOTIFY)寄存器写入 queue index 来通知 host。<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> *<span class="title">virtqueue_get_buf</span><span class="params">(struct virtqueue *_vq, <span class="keyword">unsigned</span> <span class="keyword">int</span> *len)</span></span></span><br></pre></td></tr></table></figure></p>
+<p>返回使用过的buffer，len为写入到buffer中数据的长度。获取数据，释放buffer,更新vring描述符表格中的index。<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">virtqueue_disable_cb()</span><br></pre></td></tr></table></figure></p>
+<p>Guest不再需要知道一个buffer已经使用了，也就是关闭device的中断。驱动会在初始化时注册一个回调函数，disable_cb()通常在这个virtqueue回调函数中使用，用于关闭再次的回调函数调用。<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">virtqueue_enable_cb()</span><br></pre></td></tr></table></figure></p>
+<p>与 disable_cb()刚好相反，用于重新开启设备中断的上报。</p>
+<h2 id="vring的创建流程"><a href="#vring的创建流程" class="headerlink" title="vring的创建流程"></a>vring的创建流程</h2><p>在virtio netdev driver被加载后，会调用virtnet_probe进行设备的识别，创建，初始化。</p>
+<pre><code>static struct virtio_driver virtio_net_driver = {
+    .feature_table = features,
+    .feature_table_size = ARRAY_SIZE(features),
+    .driver.name =    KBUILD_MODNAME,
+    .driver.owner =    THIS_MODULE,
+    .id_table =    id_table,
+    .probe =    virtnet_probe,  &lt;------------识别，初始化入口
+    .remove =    virtnet_remove,
+    .config_changed = virtnet_config_changed,
+    #ifdef CONFIG_PM_SLEEP
+    .freeze =    virtnet_freeze,
+    .restore =    virtnet_restore,
+    #endif
+};
+</code></pre><p>其中进行了virtio net device的属性功能的配置，网络设备的初始化和注册，而vring的创建也在其中：</p>
+<pre><code>/* Allocate/initialize the rx/tx queues, and invoke find_vqs */
+init_vqs(vi);          //创建和初始化发送/接收队列
+    ---&gt;virtnet_alloc_queues()
+    ---&gt;virtnet_find_vqs()
+</code></pre><p>virtnet_alloc_queues创建了图中virtnet_info中的send_queue 和 receive_queue结构，seng和receive queue是成对出现的。</p>
+<pre><code>static int virtnet_alloc_queues(struct virtnet_info *vi) 
+{
+    int i;
+     vi-&gt;sq = kzalloc(sizeof(*vi-&gt;sq) * vi-&gt;max_queue_pairs, GFP_KERNEL);
+     if (!vi-&gt;sq)
+          goto err_sq;
+    vi-&gt;rq = kzalloc(sizeof(*vi-&gt;rq) * vi-&gt;max_queue_pairs, GFP_KERNEL);
+     if (!vi-&gt;rq)
+          goto err_rq;
+     INIT_DELAYED_WORK(&amp;vi-&gt;refill, refill_work);
+     for (i = 0; i &lt; vi-&gt;max_queue_pairs; i++) {
+          vi-&gt;rq[i].pages = NULL;
+          netif_napi_add(vi-&gt;dev, &amp;vi-&gt;rq[i].napi, virtnet_poll, napi_weight);
+          sg_init_table(vi-&gt;rq[i].sg, ARRAY_SIZE(vi-&gt;rq[i].sg)); //初始化收端的scatterlist
+          ewma_init(&amp;vi-&gt;rq[i].mrg_avg_pkt_len, 1, RECEIVE_AVG_WEIGHT);
+          sg_init_table(vi-&gt;sq[i].sg, ARRAY_SIZE(vi-&gt;sq[i].sg)); //初始化发端的scatterlist 
+     }
+     return 0;
+err_rq:
+    kfree(vi-&gt;sq);
+    err_sq:
+     return -ENOMEM;
+}
+</code></pre><p>scatterlist即是一种数组形式的数据结构，每一项成员指向一个page的地址，偏移量，长度等。<br><img src="http://7lrywd.com1.z0.glb.clouddn.com/3.png" alt=""></p>
+<p>通过find vqs来创建vring:</p>
+<pre><code>static int virtnet_find_vqs(struct virtnet_info *vi)  
+{
+    ......
+    vi-&gt;vdev-&gt;config-&gt;find_vqs(vi-&gt;vdev, total_vqs, vqs, callbacks, names);
+    ......
+}
+</code></pre><p>vdev所对应的config的初始化在pci bus probe阶段:</p>
+<pre><code>static int virtio_pci_probe(struct pci_dev *pci_dev, const struct pci_device_id *id)
+{
+    ......
+    vp_dev-&gt;vdev.config = &amp;virtio_pci_config_ops;
+    ......
+}
+</code></pre><p>virtio_pci_config_ops是针对virtio设备配置的操作方法，主要包括四个部分1. 读写特征位;2. 读写配置空间;3. 读写状态位;4. 重启设备.</p>
+<pre><code>static const struct virtio_config_ops virtio_pci_config_ops = {
+    .get     = vp_get,                    //读取virtio配置空间的域
+    .set     = vp_set,                    //设置virtio配置空间的域
+    .get_status    = vp_get_status,          //读取状态位
+    .set_status    = vp_set_status,          //设置状态位
+    .reset     = vp_reset,                  //设备的复位
+    .find_vqs    = vp_find_vqs,            //virtqueue的创建
+    .del_vqs    = vp_del_vqs,             //virtqueue的删除
+    .get_features    = vp_get_features,
+    .finalize_features = vp_finalize_features,
+    .bus_name    = vp_bus_name,
+    .set_vq_affinity = vp_set_vq_affinity,
+};
+</code></pre><p>其中最核心的是setup_vq()：</p>
+<pre><code>/*
+    函数功能：为目标设备获取一个queue
+    vdev：目标设备
+    index：给目标设备使用的queue的编号
+    callback：queue的回调函数
+    name：queue的名字
+    msix_vec：给queue使用的msix vector的编号
+*/
+static struct virtqueue *setup_vq(struct virtio_device *vdev, unsigned index,
+   void (*callback)(struct virtqueue *vq),
+   const char *name,
+   u16 msix_vec)
+{
+    //通过VIRTIO_PCI_QUEUE_SEL配置域，选择我们需要的queue的编号index
+    iowrite16(index, vp_dev-&gt;ioaddr + VIRTIO_PCI_QUEUE_SEL);
+
+    //通过读取VIRTIO_PCI_QUEUE_NUM配置域，获取index编号的queue的
+    num = ioread16(vp_dev-&gt;ioaddr + VIRTIO_PCI_QUEUE_NUM); 
+
+     /* 如果num为0，则该queue不可用
+       通过读取VIRTIO_PCI_QUEUE_PFN配置域返回queue的地址，
+       如果该queue的地址非空，则说明已经在被使用了，该queue不可用。
+      */
+     if (!num || ioread32(vp_dev-&gt;ioaddr + VIRTIO_PCI_QUEUE_PFN))
+          return ERR_PTR(-ENOENT);
+
+    info = kmalloc(sizeof(struct virtio_pci_vq_info), GFP_KERNEL);
+
+    //计算vring所需要的空间大小
+    size = PAGE_ALIGN(vring_size(num, VIRTIO_PCI_VRING_ALIGN));  
+
+     //分配size大小的若干个page空间为vring所用
+     info-&gt;queue = alloc_pages_exact(size, GFP_KERNEL|__GFP_ZERO);    
+
+    /* activate the queue
+       通过VIRTIO_PCI_QUEUE_PFN配置域将vring的地址通告给qemu，
+       这样index编号的queue有大小，有空间qemu通过该块vring的
+       共享空间与guest进行数据的交互
+    */
+     iowrite32(virt_to_phys(info-&gt;queue) &gt;&gt; VIRTIO_PCI_QUEUE_ADDR_SHIFT,
+        vp_dev-&gt;ioaddr + VIRTIO_PCI_QUEUE_PFN);  
+
+    /* create the vring */
+    //对vring内部结构进行具体的初始化
+     vq = vring_new_virtqueue(index, info-&gt;num, VIRTIO_PCI_VRING_ALIGN, vdev,
+         true, info-&gt;queue, vp_notify, callback, name); 
+}
+</code></pre><p>关于num的初始值，在qemu初始化virtionet设备时进行了初始化，queue size 即kernel中读取的num初始化为256个(file:hw/virtio-net.c, line:999):</p>
+<pre><code>VirtIODevice *virtio_net_init(DeviceState *dev, NICConf *conf, virtio_net_conf *net)
+{
+    ...
+    n-&gt;rx_vq = virtio_add_queue(&amp;n-&gt;vdev, 256, virtio_net_handle_rx);
+    ...
+    n-&gt;tx_vq = virtio_add_queue(&amp;n-&gt;vdev, 256, virtio_net_handle_tx_bh);
+    ...
+}
+</code></pre><p>virtio_ring的具体结构包含3部分：</p>
+<ol>
+<li>描述符数组(descriptor table)用于存储一些关联的描述符，每个描述符都是一个对buffer的描述，包含一个 address/length的配对。</li>
+<li>可用的ring(available ring)用于Guest端表示那些描述符链当前是可用的。</li>
+<li>使用过的ring(used ring)用于表示Host端表示那些描述符已经使用。</li>
+</ol>
+<p>Ring的数目必须是2的次幂。结构如下图所示：</p>
+<p><img src="http://7lrywd.com1.z0.glb.clouddn.com/4.PNG" alt=""></p>
+<p>vring descriptor 用于指向 guest 使用的 buffer。<br>addr：guest 物理地址<br>len：buffer 的长度<br>flags：flags 的值含义包括：</p>
+<ul>
+<li>VRING_DESC_F_NEXT：用于表明当前 buffer 的下一个域是否有效，也间接表明当前 buffer 是否是 buffers list 的最后一个。</li>
+<li>VRING_DESC_F_WRITE：当前 buffer 是 read-only 还是 write-only。</li>
+<li>VRING_DESC_F_INDIRECT：表明这个 buffer 中包含一个 buffer 描述符的 list</li>
+</ul>
+<p>next：所有的 buffers 通过next串联起来组成descriptor table<br>多个buffer组成一个list由descriptor table指向这些list。</p>
+<p>Available ring 指向 guest 提供给设备的描述符,它指向一个 descriptor 链表的头。</p>
+<p>Used ring 指向 device(host)使用过的 buffers。</p>
+
+        
+        </div>
+        <footer class="article-footer">
+            <div class="share-container">
+
+
+
+</div>
+
+    <a data-url="http://royhunter.github.io/2014/08/08/virtio-virtqueue/" data-id="ck2oe6fqt004dxkkvwquk0a0b" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+<script>
+    (function ($) {
+        // Prevent duplicate binding
+        if (typeof(__SHARE_BUTTON_BINDED__) === 'undefined' || !__SHARE_BUTTON_BINDED__) {
+            __SHARE_BUTTON_BINDED__ = true;
+        } else {
+            return;
+        }
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url'),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="fab fa-twitter article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="fab fa-facebook article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="fab fa-pinterest article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                            '<a href="https://plus.google.com/share?url=' + encodedUrl + '" class="fab fa-google article-share-google" target="_blank" title="Google+"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+            
+    
+
+        </footer>
+    </div>
+    
+        
+<nav id="article-nav">
+    
+        <a href="/2014/08/09/virtio-netdev-send/" id="article-nav-newer" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Newer</strong>
+            <div class="article-nav-title">
+                
+                    Virtio----Virtio Netdev Packet Process
+                
+            </div>
+        </a>
+    
+    
+        <a href="/2014/08/05/virtio-dev-op/" id="article-nav-older" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Older</strong>
+            <div class="article-nav-title">Guest与Virtio Netdev的交互方式</div>
+        </a>
+    
+</nav>
+
+
+    
+</article>
+
+
+    
+    
+
+</section>
+            
+                
+<aside id="sidebar">
+   
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">recent</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2020/07/12/index/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"></p>
+                            <p class="item-title"><a href="/2020/07/12/index/" class="title">Blog索引</a></p>
+                            <p class="item-date"><time datetime="2020-07-12T13:33:28.000Z" itemprop="datePublished">2020-07-12</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/07/17/ovs02-vxlan/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/07/17/ovs02-vxlan/" class="title">OVS02-VXLAN内核相关实现</a></p>
+                            <p class="item-date"><time datetime="2018-07-17T12:15:34.000Z" itemprop="datePublished">2018-07-17</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/01/10/perf-tunning/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/01/10/perf-tunning/" class="title">datapath性能优化总结</a></p>
+                            <p class="item-date"><time datetime="2018-01-10T13:26:32.000Z" itemprop="datePublished">2018-01-10</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2017/04/18/ovs01/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2017/04/18/ovs01/" class="title">OVS01-OVS基础-安装、配置、Simple Case</a></p>
+                            <p class="item-date"><time datetime="2017-04-18T13:26:32.000Z" itemprop="datePublished">2017-04-18</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2016/08/28/trampolines-for-nested-functions/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Programme/">Programme</a></p>
+                            <p class="item-title"><a href="/2016/08/28/trampolines-for-nested-functions/" class="title">Trampolines for Nested Functions in GCC</a></p>
+                            <p class="item-date"><time datetime="2016-08-28T13:26:32.000Z" itemprop="datePublished">2016-08-28</time></p>
+                        </div>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">categories</h3>
+        <div class="widget">
+            <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Algorithm/">Algorithm</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Container/">Container</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Docker/">Docker</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Hyper-V/">Hyper-V</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/KVM/">KVM</a><span class="category-list-count">22</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Misc/">Misc</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/PROGRAMME/">PROGRAMME</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Programme/">Programme</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Virtualization/">Virtualization</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/go/">go</a><span class="category-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">archives</h3>
+        <div class="widget">
+            <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">July 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">July 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">January 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">April 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">August 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/06/">June 2016</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/05/">May 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/03/">March 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/02/">February 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/01/">January 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/12/">December 2015</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/11/">November 2015</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/08/">August 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/07/">July 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/06/">June 2014</a><span class="archive-list-count">5</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tags</h3>
+        <div class="widget">
+            <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Container/">Container</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Distribute/">Distribute</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/EPT/">EPT</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux-namespace/">Linux namespace</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Network/">Network</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/PROGRAMME/">PROGRAMME</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Programme-Language/">Programme Language</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/QEMU/">QEMU</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Tools/">Tools</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization/">Virtualization</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization-KVM-QEMU/">Virtualization KVM QEMU</a><span class="tag-list-count">9</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/libvirt/">libvirt</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vhost/">vhost</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/virtio/">virtio</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vps-proxy/">vps_proxy</a><span class="tag-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tag cloud</h3>
+        <div class="widget tagcloud">
+            <a href="/tags/Container/" style="font-size: 12.5px;">Container</a> <a href="/tags/Distribute/" style="font-size: 12.5px;">Distribute</a> <a href="/tags/EPT/" style="font-size: 12.5px;">EPT</a> <a href="/tags/Linux-namespace/" style="font-size: 12.5px;">Linux namespace</a> <a href="/tags/Network/" style="font-size: 15px;">Network</a> <a href="/tags/PROGRAMME/" style="font-size: 10px;">PROGRAMME</a> <a href="/tags/Programme-Language/" style="font-size: 10px;">Programme Language</a> <a href="/tags/QEMU/" style="font-size: 12.5px;">QEMU</a> <a href="/tags/Tools/" style="font-size: 12.5px;">Tools</a> <a href="/tags/Virtualization/" style="font-size: 17.5px;">Virtualization</a> <a href="/tags/Virtualization-KVM-QEMU/" style="font-size: 20px;">Virtualization KVM QEMU</a> <a href="/tags/libvirt/" style="font-size: 10px;">libvirt</a> <a href="/tags/vhost/" style="font-size: 10px;">vhost</a> <a href="/tags/virtio/" style="font-size: 17.5px;">virtio</a> <a href="/tags/vps-proxy/" style="font-size: 10px;">vps_proxy</a>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">links</h3>
+        <div class="widget">
+            <ul>
+                
+                    <li>
+                        <a href="http://hexo.io">Hexo</a>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+
+    
+    <div id="toTop" class="fas fa-angle-up"></div>
+</aside>
+
+            
+        </div>
+        <footer id="footer">
+    <div class="outer">
+        <div id="footer-info" class="inner">
+            &copy; 2019 John Doe<br>
+            Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>. Theme by <a href="http://github.com/ppoffice">PPOffice</a>
+        </div>
+    </div>
+</footer>
+        
+
+
+    
+        <script src="/libs/lightgallery/js/lightgallery.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-thumbnail.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-pager.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-autoplay.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-fullscreen.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-zoom.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-hash.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-share.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-video.min.js"></script>
+    
+    
+        <script src="/libs/justified-gallery/jquery.justifiedGallery.min.js"></script>
+    
+    
+
+
+
+<!-- Custom Scripts -->
+<script src="/js/main.js"></script>
+
+    </div>
+</body>
+</html>

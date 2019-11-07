@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <meta charset="utf-8">
+    
+    <title>KVM Run Process之KVM核心流程 | RoyLuo&#39;s Notes</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="description" content="在“KVM Run Process之Qemu核心流程”一文中讲到Qemu通过KVM_RUN调用KVM提供的API发起KVM的启动，从这里进入到了内核空间运行，本文主要讲述内核中KVM关于VM运行的核心调用流程,所使用的内核版本为linux3.15。">
+<meta name="keywords" content="Virtualization KVM QEMU">
+<meta property="og:type" content="article">
+<meta property="og:title" content="KVM Run Process之KVM核心流程">
+<meta property="og:url" content="http://royhunter.github.io/2014/07/12/KVM_RUN_PROCESS2/index.html">
+<meta property="og:site_name" content="RoyLuo&#39;s Notes">
+<meta property="og:description" content="在“KVM Run Process之Qemu核心流程”一文中讲到Qemu通过KVM_RUN调用KVM提供的API发起KVM的启动，从这里进入到了内核空间运行，本文主要讲述内核中KVM关于VM运行的核心调用流程,所使用的内核版本为linux3.15。">
+<meta property="og:locale" content="en">
+<meta property="og:image" content="http://7ktq2s.com1.z0.glb.clouddn.com/2.png">
+<meta property="og:updated_time" content="2016-06-25T04:04:42.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="KVM Run Process之KVM核心流程">
+<meta name="twitter:description" content="在“KVM Run Process之Qemu核心流程”一文中讲到Qemu通过KVM_RUN调用KVM提供的API发起KVM的启动，从这里进入到了内核空间运行，本文主要讲述内核中KVM关于VM运行的核心调用流程,所使用的内核版本为linux3.15。">
+<meta name="twitter:image" content="http://7ktq2s.com1.z0.glb.clouddn.com/2.png">
+    
+
+    
+        <link rel="alternate" href="atom.xml" title="RoyLuo&#39;s Notes" type="application/atom+xml" />
+    
+
+    
+
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fontawesome.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-brands.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-solid.min.css">
+    <link rel="stylesheet" href="/libs/open-sans/styles.css">
+    <link rel="stylesheet" href="/libs/source-code-pro/styles.css">
+
+    <link rel="stylesheet" href="/css/style.css">
+
+    <script src="/libs/jquery/2.1.3/jquery.min.js"></script>
+    
+    
+        <link rel="stylesheet" href="/libs/lightgallery/css/lightgallery.min.css">
+    
+    
+        <link rel="stylesheet" href="/libs/justified-gallery/justifiedGallery.min.css">
+    
+    
+    
+    
+
+
+</head>
+
+<body>
+    <div id="container">
+        <header id="header">
+    <div id="header-main" class="header-inner">
+        <div class="outer">
+            <a href="/" id="logo">
+                <i class="logo"></i>
+                <span class="site-title">RoyLuo&#39;s Notes</span>
+            </a>
+            <nav id="main-nav">
+                
+                    <a class="main-nav-link" href="/.">Home</a>
+                
+                    <a class="main-nav-link" href="/archives">Archives</a>
+                
+                    <a class="main-nav-link" href="/categories">Categories</a>
+                
+                    <a class="main-nav-link" href="/tags">Tags</a>
+                
+                    <a class="main-nav-link" href="/proj">Projects</a>
+                
+                    <a class="main-nav-link" href="/book">Books</a>
+                
+                    <a class="main-nav-link" href="/about">About</a>
+                
+            </nav>
+            
+                
+                <nav id="sub-nav">
+                    <div class="profile" id="profile-nav">
+                        <a id="profile-anchor" href="javascript:;">
+                            <img class="avatar" src="/css/images/image_y.png" />
+                            <i class="fas fa-caret-down"></i>
+                        </a>
+                    </div>
+                </nav>
+            
+            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+        <button type="submit" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" placeholder="Type something..." />
+            <span class="ins-close ins-selectable"><i class="fas fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script>
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: 'Posts',
+            PAGES: 'Pages',
+            CATEGORIES: 'Categories',
+            TAGS: 'Tags',
+            UNTITLED: '(Untitled)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+<script src="/js/insight.js"></script>
+
+</div>
+        </div>
+    </div>
+    <div id="main-nav-mobile" class="header-sub header-inner">
+        <table class="menu outer">
+            <tr>
+                
+                    <td><a class="main-nav-link" href="/.">Home</a></td>
+                
+                    <td><a class="main-nav-link" href="/archives">Archives</a></td>
+                
+                    <td><a class="main-nav-link" href="/categories">Categories</a></td>
+                
+                    <td><a class="main-nav-link" href="/tags">Tags</a></td>
+                
+                    <td><a class="main-nav-link" href="/proj">Projects</a></td>
+                
+                    <td><a class="main-nav-link" href="/book">Books</a></td>
+                
+                    <td><a class="main-nav-link" href="/about">About</a></td>
+                
+                <td>
+                    
+    <div class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+    </div>
+
+                </td>
+            </tr>
+        </table>
+    </div>
+</header>
+
+        <div class="outer">
+            
+                
+
+<aside id="profile" class="profile-fixed">
+    <div class="inner profile-inner">
+        <div class="base-info profile-block">
+            <img id="avatar" src="/css/images/image_y.png" />
+            <h2 id="name">Roy Luo</h2>
+            <h3 id="title">Designer &amp; Developer</h3>
+            <span id="location"><i class="fas fa-map-marker-alt" style="padding-right: 5px"></i>Beijing, China</span>
+            <a id="follow" target="_blank" href="https://github.com/royhunter/">FOLLOW</a>
+        </div>
+        <div class="article-info profile-block">
+            <div class="article-info-block">
+                43
+                <span>posts</span>
+            </div>
+            <div class="article-info-block">
+                15
+                <span>tags</span>
+            </div>
+        </div>
+        
+        <div class="profile-block social-links">
+            <table>
+                <tr>
+                    
+                    
+                    <td>
+                        <a href="http://github.com/royhunter/" target="_blank" title="github" class=tooltip>
+                            <i class="fab fa-github"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://twitter.com/RoyLuoye" target="_blank" title="twitter" class=tooltip>
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://www.facebook/roy.luo.3367" target="_blank" title="facebook" class=tooltip>
+                            <i class="fab fa-facebook"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://cn.linkedin.com/in/royluoye" target="_blank" title="linkedin" class=tooltip>
+                            <i class="fab fa-linkedin"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="/atom.xml" target="_blank" title="rss" class=tooltip>
+                            <i class="fab fa-rss"></i>
+                        </a>
+                    </td>
+                    
+                </tr>
+            </table>
+        </div>
+        
+    </div>
+</aside>
+
+            
+            <section id="main"><article id="post-KVM_RUN_PROCESS2" class="article article-type-post" itemscope itemprop="blogPost">
+    <div class="article-inner">
+        
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+            KVM Run Process之KVM核心流程
+        </h1>
+    
+
+                
+                    <div class="article-meta">
+                        
+    <div class="article-date">
+        <i class="fas fa-calendar-alt"></i>
+        <a href="/2014/07/12/KVM_RUN_PROCESS2/">
+            <time datetime="2014-07-12T12:15:34.000Z" itemprop="datePublished">2014-07-12</time>
+        </a>
+    </div>
+
+
+                        
+    <div class="article-category">
+    	<i class="fas fa-folder"></i>
+        <a class="article-category-link" href="/categories/KVM/">KVM</a>
+    </div>
+
+                        
+    <div class="article-tag">
+        <i class="fas fa-tag"></i>
+        <a class="tag-link" href="/tags/Virtualization-KVM-QEMU/">Virtualization KVM QEMU</a>
+    </div>
+
+                    </div>
+                
+            </header>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+        
+            
+            <p>在“KVM Run Process之Qemu核心流程”一文中讲到Qemu通过<em>KVM_RUN</em>调用KVM提供的API发起KVM的启动，从这里进入到了内核空间运行，本文主要讲述内核中KVM关于VM运行的核心调用流程,所使用的内核版本为linux3.15。</p>
+<a id="more"></a>
+<h2 id="KVM核心流程"><a href="#KVM核心流程" class="headerlink" title="KVM核心流程"></a>KVM核心流程</h2><h3 id="KVM-RUN的准备"><a href="#KVM-RUN的准备" class="headerlink" title="KVM RUN的准备"></a>KVM RUN的准备</h3><p>当Qemu使用kvm_vcpu_ioctl(env, KVM_RUN, 0);发起<em>KVM_RUN</em>命令时，ioctl会陷入内核，到达kvm_vcpu_ioctl()；</p>
+<pre><code>kvm_vcpu_ioctl()     file: virt/kvm/kvm_main.c, line: 1958
+    ---&gt;kvm_arch_vcpu_ioctl_run()    file: arch/x86/kvm, line: 6305
+        ---&gt;__vcpu_run()  file: arch/x86/kvm/x86.c, line: 6156
+</code></pre><p>在__vcpu_run()中也出现了一个while(){}主循环；</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> <span class="keyword">int</span> __vcpu_run(struct kvm_vcpu *vcpu)</span><br><span class="line">&#123;</span><br><span class="line">	......</span><br><span class="line">	r = <span class="number">1</span>;</span><br><span class="line">	<span class="keyword">while</span> (r &gt; <span class="number">0</span>) &#123;</span><br><span class="line">		<span class="keyword">if</span> (vcpu-&gt;arch.mp_state == KVM_MP_STATE_RUNNABLE &amp;&amp; !vcpu-&gt;arch.apf.halted)</span><br><span class="line">			r = vcpu_enter_guest(vcpu);</span><br><span class="line">		<span class="keyword">else</span> &#123;</span><br><span class="line">			......</span><br><span class="line">			&#125;</span><br><span class="line">		&#125;</span><br><span class="line">		<span class="keyword">if</span> (r &lt;= <span class="number">0</span>)     &lt;--------当r小于<span class="number">0</span>时会跳出循环体</span><br><span class="line">			<span class="keyword">break</span>;</span><br><span class="line">		......</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">return</span> r;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们看到当KVM通过__vcpu_run()进入主循环后，调用vcpu_enter_guest(),从名字上看可以知道这是进入guest模式的入口；<br>当r大于0时KVM内核代码会一直调用vcpu_enter_guest()，重复进入guest模式；<br>当r小于等于0时则会跳出循环体，此时会一步一步退到当初的入口kvm_vcpu_ioctl(),乃至于退回到用户态空间Qemu进程中,具体的地方可以参看上一篇文章，这里也给出相关的代码片段：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">kvm_cpu_exec</span><span class="params">(CPUArchState *env)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="keyword">do</span> &#123;</span><br><span class="line">        run_ret = kvm_vcpu_ioctl(env, KVM_RUN, <span class="number">0</span>);</span><br><span class="line">        <span class="keyword">switch</span> (run-&gt;exit_reason) &#123;     &lt;----------Qemu根据退出的原因进行处理，主要是IO相关方面的操作</span><br><span class="line">        <span class="keyword">case</span> KVM_EXIT_IO:</span><br><span class="line">        	kvm_handle_io();</span><br><span class="line">			......</span><br><span class="line">        <span class="keyword">case</span> KVM_EXIT_MMIO:</span><br><span class="line">        	cpu_physical_memory_rw();</span><br><span class="line">			......</span><br><span class="line">        <span class="keyword">case</span> KVM_EXIT_IRQ_WINDOW_OPEN:</span><br><span class="line">        	ret = EXCP_INTERRUPT;</span><br><span class="line">            ......</span><br><span class="line">        <span class="keyword">case</span> KVM_EXIT_SHUTDOWN:</span><br><span class="line">        	ret = EXCP_INTERRUPT;</span><br><span class="line">            ......</span><br><span class="line">        <span class="keyword">case</span> KVM_EXIT_UNKNOWN:</span><br><span class="line">        	ret = <span class="number">-1</span></span><br><span class="line">            ......</span><br><span class="line">        <span class="keyword">case</span> KVM_EXIT_INTERNAL_ERROR:</span><br><span class="line">        	ret = kvm_handle_internal_error(env, run);</span><br><span class="line">            ......</span><br><span class="line">        <span class="keyword">default</span>:</span><br><span class="line">        	ret = kvm_arch_handle_exit(env, run);</span><br><span class="line">            ......</span><br><span class="line">        &#125;</span><br><span class="line">    &#125; <span class="keyword">while</span> (ret == <span class="number">0</span>);</span><br><span class="line">    env-&gt;exit_request = <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">return</span> ret;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>Qemu根据退出的原因进行处理，主要是IO相关方面的操作，当然处理完后又会调用kvm_vcpu_ioctl(env, KVM_RUN, 0)再次RUN KMV。<br>我们再次拉回到内核空间，走到了static int vcpu_enter_guest(struct kvm_vcpu *vcpu)函数,其中有几个重要的初始化准备工作：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">static int vcpu_enter_guest(struct kvm_vcpu *vcpu)  file: arch/x86/kvm/x86.c, line: 5944</span><br><span class="line">&#123;</span><br><span class="line">	......</span><br><span class="line">	kvm_check_request();     &lt;-------查看是否有guest退出的相关请求</span><br><span class="line">	......</span><br><span class="line">	kvm_mmu_reload(vcpu);    &lt;-------Guest的MMU初始化，为内存虚拟化做准备</span><br><span class="line">	......</span><br><span class="line">	preempt_disable();       &lt;-------内核抢占关闭</span><br><span class="line">	......</span><br><span class="line">	kvm_x86_ops-&gt;run(vcpu);  &lt;-------体系架构相关的run操作</span><br><span class="line">	......                   &lt;-------到这里表明guest模式已退出</span><br><span class="line">	kvm_x86_ops-&gt;handle_external_intr(vcpu);  &lt;-------host处理外部中断</span><br><span class="line">	......</span><br><span class="line">	preempt_enable();        &lt;-------内核抢占使能</span><br><span class="line">	......</span><br><span class="line">	r = kvm_x86_ops-&gt;handle_exit(vcpu);  &lt;------根据具体的退出原因进行处理</span><br><span class="line">	<span class="keyword">return</span> r;</span><br><span class="line">	......</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="Guest的进入"><a href="#Guest的进入" class="headerlink" title="Guest的进入"></a>Guest的进入</h3><p>kvm_x86_ops是一个x86体系相关的函数集，定义位于file: arch/x86/kvm/vmx.c, line: 8693</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> <span class="class"><span class="keyword">struct</span> <span class="title">kvm_x86_ops</span> <span class="title">vmx_x86_ops</span> = &#123;</span></span><br><span class="line">	......</span><br><span class="line">	.run = vmx_vcpu_run,</span><br><span class="line">	.handle_exit = vmx_handle_exit,</span><br><span class="line">	......</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>vmx_vcpu_run()中一段核心的汇编函数的功能主要就是从ROOT模式切换至NO ROOT模式，主要进行了：</p>
+<ol>
+<li>Store host registers：主要将host状态上下文存入到VM对应的VMCS结构中；</li>
+<li>Load guest registers：主要讲guest状态进行加载；</li>
+<li>Enter guest mode: 通过ASM_VMX_VMLAUNCH指令进行VM的切换，从此进入另一个世界,即Guest OS中；</li>
+<li>Save guest registers, load host registers： 当发生VM Exit时，需要保持guest状态，同时加载HOST；</li>
+</ol>
+<p>当第4步完成后，Guest即从NO ROOT模式退回到了ROOT模式中，又恢复了HOST的执行生涯。</p>
+<h3 id="Guest的退出处理"><a href="#Guest的退出处理" class="headerlink" title="Guest的退出处理"></a>Guest的退出处理</h3><p>当然Guest的退出不会就这么算了，退出总是有原因的，为了保证Guest后续的顺利运行，KVM要根据退出原因进行处理，此时重要的函数为：vmx_handle_exit();</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">static int vmx_handle_exit(struct kvm_vcpu *vcpu)    file: arch/x86/kvm/vmx.c, line: 6877</span><br><span class="line">&#123;</span><br><span class="line">	......</span><br><span class="line">	<span class="keyword">if</span> (exit_reason &lt; kvm_vmx_max_exit_handlers</span><br><span class="line">	    &amp;&amp; kvm_vmx_exit_handlers[exit_reason])</span><br><span class="line">		<span class="keyword">return</span> kvm_vmx_exit_handlers[exit_reason](vcpu);     &lt;-----根据reason调用对应的注册函数处理</span><br><span class="line">	<span class="keyword">else</span> &#123;</span><br><span class="line">		vcpu-&gt;run-&gt;exit_reason = KVM_EXIT_UNKNOWN;</span><br><span class="line">		vcpu-&gt;run-&gt;hw.hardware_exit_reason = exit_reason;</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">return</span> <span class="number">0</span>;      &lt;--------若发生退出原因不在KVM预定义的handler范围内，则返回<span class="number">0</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>而众多的exit reason对应的handler如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">static</span> <span class="title">int</span> <span class="params">(*<span class="keyword">const</span> kvm_vmx_exit_handlers[])</span><span class="params">(struct kvm_vcpu *vcpu)</span> </span>= &#123;</span><br><span class="line">	[EXIT_REASON_EXCEPTION_NMI]           = handle_exception,     &lt;------异常</span><br><span class="line">	[EXIT_REASON_EXTERNAL_INTERRUPT]      = handle_external_interrupt,  &lt;------外部中断</span><br><span class="line">	[EXIT_REASON_TRIPLE_FAULT]            = handle_triple_fault,</span><br><span class="line">	[EXIT_REASON_NMI_WINDOW]	          = handle_nmi_window,</span><br><span class="line">	[EXIT_REASON_IO_INSTRUCTION]          = handle_io,      &lt;------io指令操作</span><br><span class="line">	[EXIT_REASON_CR_ACCESS]               = handle_cr,</span><br><span class="line">	[EXIT_REASON_DR_ACCESS]               = handle_dr,</span><br><span class="line">	[EXIT_REASON_CPUID]                   = handle_cpuid,</span><br><span class="line">	[EXIT_REASON_MSR_READ]                = handle_rdmsr,</span><br><span class="line">	[EXIT_REASON_MSR_WRITE]               = handle_wrmsr,</span><br><span class="line">	[EXIT_REASON_PENDING_INTERRUPT]       = handle_interrupt_window,</span><br><span class="line">	[EXIT_REASON_HLT]                     = handle_halt,</span><br><span class="line">	[EXIT_REASON_INVD]		              = handle_invd,</span><br><span class="line">	[EXIT_REASON_INVLPG]		          = handle_invlpg,</span><br><span class="line">	[EXIT_REASON_RDPMC]                   = handle_rdpmc,</span><br><span class="line">	[EXIT_REASON_VMCALL]                  = handle_vmcall,     &lt;-----VM相关操作指令</span><br><span class="line">	[EXIT_REASON_VMCLEAR]	              = handle_vmclear,</span><br><span class="line">	[EXIT_REASON_VMLAUNCH]                = handle_vmlaunch,</span><br><span class="line">	[EXIT_REASON_VMPTRLD]                 = handle_vmptrld,</span><br><span class="line">	[EXIT_REASON_VMPTRST]                 = handle_vmptrst,</span><br><span class="line">	[EXIT_REASON_VMREAD]                  = handle_vmread,</span><br><span class="line">	[EXIT_REASON_VMRESUME]                = handle_vmresume,</span><br><span class="line">	[EXIT_REASON_VMWRITE]                 = handle_vmwrite,</span><br><span class="line">	[EXIT_REASON_VMOFF]                   = handle_vmoff,</span><br><span class="line">	[EXIT_REASON_VMON]                    = handle_vmon,</span><br><span class="line">	[EXIT_REASON_TPR_BELOW_THRESHOLD]     = handle_tpr_below_threshold,</span><br><span class="line">	[EXIT_REASON_APIC_ACCESS]             = handle_apic_access,</span><br><span class="line">	[EXIT_REASON_APIC_WRITE]              = handle_apic_write,</span><br><span class="line">	[EXIT_REASON_EOI_INDUCED]             = handle_apic_eoi_induced,</span><br><span class="line">	[EXIT_REASON_WBINVD]                  = handle_wbinvd,</span><br><span class="line">	[EXIT_REASON_XSETBV]                  = handle_xsetbv,</span><br><span class="line">	[EXIT_REASON_TASK_SWITCH]             = handle_task_switch,     &lt;----进程切换</span><br><span class="line">	[EXIT_REASON_MCE_DURING_VMENTRY]      = handle_machine_check,</span><br><span class="line">	[EXIT_REASON_EPT_VIOLATION]	          = handle_ept_violation,   &lt;----EPT缺页异常</span><br><span class="line">	[EXIT_REASON_EPT_MISCONFIG]           = handle_ept_misconfig,</span><br><span class="line">	[EXIT_REASON_PAUSE_INSTRUCTION]       = handle_pause,</span><br><span class="line">	[EXIT_REASON_MWAIT_INSTRUCTION]	      = handle_invalid_op,</span><br><span class="line">	[EXIT_REASON_MONITOR_INSTRUCTION]     = handle_invalid_op,</span><br><span class="line">	[EXIT_REASON_INVEPT]                  = handle_invept,</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>当该众多的handler处理成功后，会得到一个大于0的返回值，而处理失败则会返回一个小于0的数；则又回到__vcpu_run()中的主循环中；<br>vcpu_enter_guest() &gt; 0时： 则继续循环，再次准备进入Guest模式；<br>vcpu_enter_guest() &lt;= 0时： 则跳出循环，返回用户态空间，由Qemu根据退出原因进行处理。</p>
+<h2 id="Conclusion"><a href="#Conclusion" class="headerlink" title="Conclusion"></a>Conclusion</h2><p>至此，KVM内核代码部分的核心调用流程的分析到此结束，从上述流程中可以看出，KVM内核代码的主要工作如下：</p>
+<ol>
+<li>Guest进入前的准备工作；</li>
+<li>Guest的进入；</li>
+<li>根据Guest的退出原因进行处理，若kvm自身能够处理的则自行处理；若KVM无法处理，则返回到用户态空间的Qemu进程中进行处理；</li>
+</ol>
+<p>总而言之，KVM与Qemu的工作是为了确保Guest的正常运行，通过各种异常的处理，使Guest无需感知其运行的虚拟环境。</p>
+<p>附图：<br><img src="http://7ktq2s.com1.z0.glb.clouddn.com/2.png" alt=""></p>
+
+        
+        </div>
+        <footer class="article-footer">
+            <div class="share-container">
+
+
+
+</div>
+
+    <a data-url="http://royhunter.github.io/2014/07/12/KVM_RUN_PROCESS2/" data-id="ck2oe6fnd0006xkkvjupalaye" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+<script>
+    (function ($) {
+        // Prevent duplicate binding
+        if (typeof(__SHARE_BUTTON_BINDED__) === 'undefined' || !__SHARE_BUTTON_BINDED__) {
+            __SHARE_BUTTON_BINDED__ = true;
+        } else {
+            return;
+        }
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url'),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="fab fa-twitter article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="fab fa-facebook article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="fab fa-pinterest article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                            '<a href="https://plus.google.com/share?url=' + encodedUrl + '" class="fab fa-google article-share-google" target="_blank" title="Google+"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+            
+    
+
+        </footer>
+    </div>
+    
+        
+<nav id="article-nav">
+    
+        <a href="/2014/07/17/netdev-virtual-1/" id="article-nav-newer" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Newer</strong>
+            <div class="article-nav-title">
+                
+                    Qemu之Network Device全虚拟方案一:前端网络流的建立
+                
+            </div>
+        </a>
+    
+    
+        <a href="/2014/07/12/KVM-RUN-PROCESS/" id="article-nav-older" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Older</strong>
+            <div class="article-nav-title">KVM Run Process之Qemu核心流程</div>
+        </a>
+    
+</nav>
+
+
+    
+</article>
+
+
+    
+    
+
+</section>
+            
+                
+<aside id="sidebar">
+   
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">recent</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2020/07/12/index/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"></p>
+                            <p class="item-title"><a href="/2020/07/12/index/" class="title">Blog索引</a></p>
+                            <p class="item-date"><time datetime="2020-07-12T13:33:28.000Z" itemprop="datePublished">2020-07-12</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/07/17/ovs02-vxlan/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/07/17/ovs02-vxlan/" class="title">OVS02-VXLAN内核相关实现</a></p>
+                            <p class="item-date"><time datetime="2018-07-17T12:15:34.000Z" itemprop="datePublished">2018-07-17</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/01/10/perf-tunning/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/01/10/perf-tunning/" class="title">datapath性能优化总结</a></p>
+                            <p class="item-date"><time datetime="2018-01-10T13:26:32.000Z" itemprop="datePublished">2018-01-10</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2017/04/18/ovs01/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2017/04/18/ovs01/" class="title">OVS01-OVS基础-安装、配置、Simple Case</a></p>
+                            <p class="item-date"><time datetime="2017-04-18T13:26:32.000Z" itemprop="datePublished">2017-04-18</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2016/08/28/trampolines-for-nested-functions/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Programme/">Programme</a></p>
+                            <p class="item-title"><a href="/2016/08/28/trampolines-for-nested-functions/" class="title">Trampolines for Nested Functions in GCC</a></p>
+                            <p class="item-date"><time datetime="2016-08-28T13:26:32.000Z" itemprop="datePublished">2016-08-28</time></p>
+                        </div>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">categories</h3>
+        <div class="widget">
+            <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Algorithm/">Algorithm</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Container/">Container</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Docker/">Docker</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Hyper-V/">Hyper-V</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/KVM/">KVM</a><span class="category-list-count">22</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Misc/">Misc</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/PROGRAMME/">PROGRAMME</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Programme/">Programme</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Virtualization/">Virtualization</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/go/">go</a><span class="category-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">archives</h3>
+        <div class="widget">
+            <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">July 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">July 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">January 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">April 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">August 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/06/">June 2016</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/05/">May 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/03/">March 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/02/">February 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/01/">January 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/12/">December 2015</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/11/">November 2015</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/08/">August 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/07/">July 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/06/">June 2014</a><span class="archive-list-count">5</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tags</h3>
+        <div class="widget">
+            <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Container/">Container</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Distribute/">Distribute</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/EPT/">EPT</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux-namespace/">Linux namespace</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Network/">Network</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/PROGRAMME/">PROGRAMME</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Programme-Language/">Programme Language</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/QEMU/">QEMU</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Tools/">Tools</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization/">Virtualization</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization-KVM-QEMU/">Virtualization KVM QEMU</a><span class="tag-list-count">9</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/libvirt/">libvirt</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vhost/">vhost</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/virtio/">virtio</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vps-proxy/">vps_proxy</a><span class="tag-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tag cloud</h3>
+        <div class="widget tagcloud">
+            <a href="/tags/Container/" style="font-size: 12.5px;">Container</a> <a href="/tags/Distribute/" style="font-size: 12.5px;">Distribute</a> <a href="/tags/EPT/" style="font-size: 12.5px;">EPT</a> <a href="/tags/Linux-namespace/" style="font-size: 12.5px;">Linux namespace</a> <a href="/tags/Network/" style="font-size: 15px;">Network</a> <a href="/tags/PROGRAMME/" style="font-size: 10px;">PROGRAMME</a> <a href="/tags/Programme-Language/" style="font-size: 10px;">Programme Language</a> <a href="/tags/QEMU/" style="font-size: 12.5px;">QEMU</a> <a href="/tags/Tools/" style="font-size: 12.5px;">Tools</a> <a href="/tags/Virtualization/" style="font-size: 17.5px;">Virtualization</a> <a href="/tags/Virtualization-KVM-QEMU/" style="font-size: 20px;">Virtualization KVM QEMU</a> <a href="/tags/libvirt/" style="font-size: 10px;">libvirt</a> <a href="/tags/vhost/" style="font-size: 10px;">vhost</a> <a href="/tags/virtio/" style="font-size: 17.5px;">virtio</a> <a href="/tags/vps-proxy/" style="font-size: 10px;">vps_proxy</a>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">links</h3>
+        <div class="widget">
+            <ul>
+                
+                    <li>
+                        <a href="http://hexo.io">Hexo</a>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+
+    
+    <div id="toTop" class="fas fa-angle-up"></div>
+</aside>
+
+            
+        </div>
+        <footer id="footer">
+    <div class="outer">
+        <div id="footer-info" class="inner">
+            &copy; 2019 John Doe<br>
+            Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>. Theme by <a href="http://github.com/ppoffice">PPOffice</a>
+        </div>
+    </div>
+</footer>
+        
+
+
+    
+        <script src="/libs/lightgallery/js/lightgallery.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-thumbnail.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-pager.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-autoplay.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-fullscreen.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-zoom.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-hash.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-share.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-video.min.js"></script>
+    
+    
+        <script src="/libs/justified-gallery/jquery.justifiedGallery.min.js"></script>
+    
+    
+
+
+
+<!-- Custom Scripts -->
+<script src="/js/main.js"></script>
+
+    </div>
+</body>
+</html>

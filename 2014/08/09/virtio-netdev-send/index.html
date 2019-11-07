@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <meta charset="utf-8">
+    
+    <title>Virtio----Virtio Netdev Packet Process | RoyLuo&#39;s Notes</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="description" content="在前面几文中已经大体介绍了virtio的重要组成，包括virtio net设备的创建，vring的创建，与virtio设备的交互方式，我们就从网络数据包的发送角度来看下virtio的具体使用流程。">
+<meta name="keywords" content="virtio">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Virtio----Virtio Netdev Packet Process">
+<meta property="og:url" content="http://royhunter.github.io/2014/08/09/virtio-netdev-send/index.html">
+<meta property="og:site_name" content="RoyLuo&#39;s Notes">
+<meta property="og:description" content="在前面几文中已经大体介绍了virtio的重要组成，包括virtio net设备的创建，vring的创建，与virtio设备的交互方式，我们就从网络数据包的发送角度来看下virtio的具体使用流程。">
+<meta property="og:locale" content="en">
+<meta property="og:image" content="http://7lrywd.com1.z0.glb.clouddn.com/5.PNG">
+<meta property="og:image" content="http://7lrywd.com1.z0.glb.clouddn.com/6.PNG">
+<meta property="og:updated_time" content="2016-06-25T04:08:52.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Virtio----Virtio Netdev Packet Process">
+<meta name="twitter:description" content="在前面几文中已经大体介绍了virtio的重要组成，包括virtio net设备的创建，vring的创建，与virtio设备的交互方式，我们就从网络数据包的发送角度来看下virtio的具体使用流程。">
+<meta name="twitter:image" content="http://7lrywd.com1.z0.glb.clouddn.com/5.PNG">
+    
+
+    
+        <link rel="alternate" href="atom.xml" title="RoyLuo&#39;s Notes" type="application/atom+xml" />
+    
+
+    
+
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fontawesome.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-brands.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-solid.min.css">
+    <link rel="stylesheet" href="/libs/open-sans/styles.css">
+    <link rel="stylesheet" href="/libs/source-code-pro/styles.css">
+
+    <link rel="stylesheet" href="/css/style.css">
+
+    <script src="/libs/jquery/2.1.3/jquery.min.js"></script>
+    
+    
+        <link rel="stylesheet" href="/libs/lightgallery/css/lightgallery.min.css">
+    
+    
+        <link rel="stylesheet" href="/libs/justified-gallery/justifiedGallery.min.css">
+    
+    
+    
+    
+
+
+</head>
+
+<body>
+    <div id="container">
+        <header id="header">
+    <div id="header-main" class="header-inner">
+        <div class="outer">
+            <a href="/" id="logo">
+                <i class="logo"></i>
+                <span class="site-title">RoyLuo&#39;s Notes</span>
+            </a>
+            <nav id="main-nav">
+                
+                    <a class="main-nav-link" href="/.">Home</a>
+                
+                    <a class="main-nav-link" href="/archives">Archives</a>
+                
+                    <a class="main-nav-link" href="/categories">Categories</a>
+                
+                    <a class="main-nav-link" href="/tags">Tags</a>
+                
+                    <a class="main-nav-link" href="/proj">Projects</a>
+                
+                    <a class="main-nav-link" href="/book">Books</a>
+                
+                    <a class="main-nav-link" href="/about">About</a>
+                
+            </nav>
+            
+                
+                <nav id="sub-nav">
+                    <div class="profile" id="profile-nav">
+                        <a id="profile-anchor" href="javascript:;">
+                            <img class="avatar" src="/css/images/image_y.png" />
+                            <i class="fas fa-caret-down"></i>
+                        </a>
+                    </div>
+                </nav>
+            
+            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+        <button type="submit" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" placeholder="Type something..." />
+            <span class="ins-close ins-selectable"><i class="fas fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script>
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: 'Posts',
+            PAGES: 'Pages',
+            CATEGORIES: 'Categories',
+            TAGS: 'Tags',
+            UNTITLED: '(Untitled)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+<script src="/js/insight.js"></script>
+
+</div>
+        </div>
+    </div>
+    <div id="main-nav-mobile" class="header-sub header-inner">
+        <table class="menu outer">
+            <tr>
+                
+                    <td><a class="main-nav-link" href="/.">Home</a></td>
+                
+                    <td><a class="main-nav-link" href="/archives">Archives</a></td>
+                
+                    <td><a class="main-nav-link" href="/categories">Categories</a></td>
+                
+                    <td><a class="main-nav-link" href="/tags">Tags</a></td>
+                
+                    <td><a class="main-nav-link" href="/proj">Projects</a></td>
+                
+                    <td><a class="main-nav-link" href="/book">Books</a></td>
+                
+                    <td><a class="main-nav-link" href="/about">About</a></td>
+                
+                <td>
+                    
+    <div class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+    </div>
+
+                </td>
+            </tr>
+        </table>
+    </div>
+</header>
+
+        <div class="outer">
+            
+                
+
+<aside id="profile" class="profile-fixed">
+    <div class="inner profile-inner">
+        <div class="base-info profile-block">
+            <img id="avatar" src="/css/images/image_y.png" />
+            <h2 id="name">Roy Luo</h2>
+            <h3 id="title">Designer &amp; Developer</h3>
+            <span id="location"><i class="fas fa-map-marker-alt" style="padding-right: 5px"></i>Beijing, China</span>
+            <a id="follow" target="_blank" href="https://github.com/royhunter/">FOLLOW</a>
+        </div>
+        <div class="article-info profile-block">
+            <div class="article-info-block">
+                43
+                <span>posts</span>
+            </div>
+            <div class="article-info-block">
+                15
+                <span>tags</span>
+            </div>
+        </div>
+        
+        <div class="profile-block social-links">
+            <table>
+                <tr>
+                    
+                    
+                    <td>
+                        <a href="http://github.com/royhunter/" target="_blank" title="github" class=tooltip>
+                            <i class="fab fa-github"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://twitter.com/RoyLuoye" target="_blank" title="twitter" class=tooltip>
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://www.facebook/roy.luo.3367" target="_blank" title="facebook" class=tooltip>
+                            <i class="fab fa-facebook"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://cn.linkedin.com/in/royluoye" target="_blank" title="linkedin" class=tooltip>
+                            <i class="fab fa-linkedin"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="/atom.xml" target="_blank" title="rss" class=tooltip>
+                            <i class="fab fa-rss"></i>
+                        </a>
+                    </td>
+                    
+                </tr>
+            </table>
+        </div>
+        
+    </div>
+</aside>
+
+            
+            <section id="main"><article id="post-virtio-netdev-send" class="article article-type-post" itemscope itemprop="blogPost">
+    <div class="article-inner">
+        
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+            Virtio----Virtio Netdev Packet Process
+        </h1>
+    
+
+                
+                    <div class="article-meta">
+                        
+    <div class="article-date">
+        <i class="fas fa-calendar-alt"></i>
+        <a href="/2014/08/09/virtio-netdev-send/">
+            <time datetime="2014-08-09T01:40:31.000Z" itemprop="datePublished">2014-08-09</time>
+        </a>
+    </div>
+
+
+                        
+    <div class="article-category">
+    	<i class="fas fa-folder"></i>
+        <a class="article-category-link" href="/categories/KVM/">KVM</a>
+    </div>
+
+                        
+    <div class="article-tag">
+        <i class="fas fa-tag"></i>
+        <a class="tag-link" href="/tags/virtio/">virtio</a>
+    </div>
+
+                    </div>
+                
+            </header>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+        
+            
+            <p>在前面几文中已经大体介绍了virtio的重要组成，包括virtio net设备的创建，vring的创建，与virtio设备的交互方式，我们就从网络数据包的发送角度来看下virtio的具体使用流程。</p>
+<a id="more"></a>
+<h2 id="流程分析"><a href="#流程分析" class="headerlink" title="流程分析"></a>流程分析</h2><p>当Kernel中的网络数据包从内核协议栈下来后，必然要走到设备注册的发送函数， virtio netdev注册的的发送函数即virtnet_netdev中的virtnet_netdev();<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> <span class="keyword">const</span> <span class="class"><span class="keyword">struct</span> <span class="title">net_device_ops</span> <span class="title">virtnet_netdev</span> = &#123;</span></span><br><span class="line">	.ndo_open = virtnet_open,</span><br><span class="line">	.ndo_stop = virtnet_close,</span><br><span class="line">	.ndo_start_xmit = start_xmit,        &lt;----------------</span><br><span class="line">	.ndo_validate_addr = eth_validate_addr,</span><br><span class="line">	.ndo_set_mac_address = virtnet_set_mac_address,</span><br><span class="line">	.ndo_set_rx_mode = virtnet_set_rx_mode,</span><br><span class="line">	.ndo_change_mtu	 = virtnet_change_mtu,</span><br><span class="line">	.ndo_get_stats64 = virtnet_stats,</span><br><span class="line">	.ndo_vlan_rx_add_vid = virtnet_vlan_rx_add_vid,</span><br><span class="line">	.ndo_vlan_rx_kill_vid = virtnet_vlan_rx_kill_vid,</span><br><span class="line">	#ifdef CONFIG_NET_POLL_CONTROLLER</span><br><span class="line"> 	.ndo_poll_controller = virtnet_netpoll,</span><br><span class="line">	#endif</span><br><span class="line">&#125;;</span><br><span class="line"><span class="function"><span class="keyword">static</span> netdev_tx_t <span class="title">start_xmit</span><span class="params">(struct sk_buff *skb, struct net_device *dev)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	......</span><br><span class="line">    err = xmit_skb(sq, skb);  </span><br><span class="line">	......</span><br><span class="line">    virtqueue_kick(sq-&gt;vq);</span><br><span class="line">	......</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>在start_xmit()中，主要的操作是使数据包入vring队列：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">int</span> <span class="title">xmit_skb</span><span class="params">(struct send_queue *sq, struct sk_buff *skb)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">skb_vnet_hdr</span> *<span class="title">hdr</span>;</span></span><br><span class="line">    hdr_len = <span class="keyword">sizeof</span> hdr-&gt;hdr;</span><br><span class="line">    hdr = skb_vnet_hdr(skb);</span><br><span class="line">    ......</span><br><span class="line">    sg_set_buf(sq-&gt;sg, hdr, hdr_len);</span><br><span class="line">  	num_sg = skb_to_sgvec(skb, sq-&gt;sg + <span class="number">1</span>, <span class="number">0</span>, skb-&gt;len) + <span class="number">1</span>;</span><br><span class="line">    <span class="keyword">return</span> virtqueue_add_outbuf(sq-&gt;vq, sq-&gt;sg, num_sg, skb, GFP_ATOMIC);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>在每个进入scatter-gather list的packet之前，需要有一个virtio_net_hdr结构的头部信息，用以<br>支持checksum offload与TCP/UDP Segmentation offload。所以在上述流程中先使用sg_set_buf(sq-&gt;sg, hdr, hdr_len)将virtio-net-hdr的buffer填入了scatter-gather list，如下是virtio_net_hdr的结构;<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">skb_vnet_hdr</span> &#123;</span></span><br><span class="line">	<span class="keyword">union</span> &#123;</span><br><span class="line">		<span class="class"><span class="keyword">struct</span> <span class="title">virtio_net_hdr</span> <span class="title">hdr</span>;</span></span><br><span class="line">		<span class="class"><span class="keyword">struct</span> <span class="title">virtio_net_hdr_mrg_rxbuf</span> <span class="title">mhdr</span>;</span></span><br><span class="line">	&#125;;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">virtio_net_hdr</span> &#123;</span></span><br><span class="line">	<span class="meta">#<span class="meta-keyword">define</span> VIRTIO_NET_HDR_F_NEEDS_CSUM	1	<span class="comment">// Use csum_start, csum_offset</span></span></span><br><span class="line">	<span class="meta">#<span class="meta-keyword">define</span> VIRTIO_NET_HDR_F_DATA_VALID	2	<span class="comment">// Csum is valid</span></span></span><br><span class="line"> 	__u8 flags;</span><br><span class="line">	<span class="meta">#<span class="meta-keyword">define</span> VIRTIO_NET_HDR_GSO_NONE	 0	<span class="comment">// Not a GSO frame</span></span></span><br><span class="line">	<span class="meta">#<span class="meta-keyword">define</span> VIRTIO_NET_HDR_GSO_TCPV4	1	<span class="comment">// GSO frame, IPv4 TCP (TSO)</span></span></span><br><span class="line">	<span class="meta">#<span class="meta-keyword">define</span> VIRTIO_NET_HDR_GSO_UDP	 3	<span class="comment">// GSO frame, IPv4 UDP (UFO)</span></span></span><br><span class="line">	<span class="meta">#<span class="meta-keyword">define</span> VIRTIO_NET_HDR_GSO_TCPV6	4	<span class="comment">// GSO frame, IPv6 TCP</span></span></span><br><span class="line">	<span class="meta">#<span class="meta-keyword">define</span> VIRTIO_NET_HDR_GSO_ECN	 0x80	<span class="comment">// TCP has ECN set</span></span></span><br><span class="line"> 	__u8 gso_type;</span><br><span class="line"> 	__u16 hdr_len;	 <span class="comment">/* Ethernet + IP + tcp/udp hdrs */</span></span><br><span class="line"> 	__u16 gso_size;	 <span class="comment">/* Bytes to append to hdr_len per frame */</span></span><br><span class="line"> 	__u16 csum_start;	<span class="comment">/* Position to start checksumming from */</span></span><br><span class="line"> 	__u16 csum_offset;	<span class="comment">/* Offset after that to place checksum */</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure></p>
+<p>将virtio_net_hdr塞入scatter-gather list，然后再入packet的buffer。其中都会调用到sg_set_page()，主要的操作就是计算待发送数据buffer占用的page的基址，相对基址的偏移量及length。<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">inline</span> <span class="keyword">void</span> <span class="title">sg_set_buf</span><span class="params">(struct scatterlist *sg, <span class="keyword">const</span> <span class="keyword">void</span> *buf, <span class="keyword">unsigned</span> <span class="keyword">int</span> buflen)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line"> 	sg_set_page(sg, virt_to_page(buf), buflen, offset_in_page(buf));</span><br><span class="line">&#125;</span><br><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">inline</span> <span class="keyword">void</span> <span class="title">sg_set_page</span><span class="params">(struct scatterlist *sg, struct page *page,</span></span></span><br><span class="line"><span class="function"><span class="params">          <span class="keyword">unsigned</span> <span class="keyword">int</span> len, <span class="keyword">unsigned</span> <span class="keyword">int</span> offset)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line"> 	sg_assign_page(sg, page);</span><br><span class="line"> 	sg-&gt;offset = offset;</span><br><span class="line"> 	sg-&gt;length = len;</span><br><span class="line">&#125;</span><br><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">inline</span> <span class="keyword">void</span> <span class="title">sg_assign_page</span><span class="params">(struct scatterlist *sg, struct page *page)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line"> 	<span class="keyword">unsigned</span> <span class="keyword">long</span> page_link = sg-&gt;page_link &amp; <span class="number">0x3</span>;</span><br><span class="line">	<span class="comment">/*</span></span><br><span class="line"><span class="comment">	 * In order for the low bit stealing approach to work, pages</span></span><br><span class="line"><span class="comment">	 * must be aligned at a 32-bit boundary as a minimum.</span></span><br><span class="line"><span class="comment">	 */</span></span><br><span class="line">	BUG_ON((<span class="keyword">unsigned</span> <span class="keyword">long</span>) page &amp; <span class="number">0x03</span>);</span><br><span class="line">	<span class="meta">#<span class="meta-keyword">ifdef</span> CONFIG_DEBUG_SG</span></span><br><span class="line">	BUG_ON(sg-&gt;sg_magic != SG_MAGIC);</span><br><span class="line">	BUG_ON(sg_is_chain(sg));</span><br><span class="line">	<span class="meta">#<span class="meta-keyword">endif</span></span></span><br><span class="line">	sg-&gt;page_link = page_link | (<span class="keyword">unsigned</span> <span class="keyword">long</span>) page;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p><img src="http://7lrywd.com1.z0.glb.clouddn.com/5.PNG" alt=""></p>
+<p>skbuffer与sg list的关系如上所示。</p>
+<p>最后调用return virtqueue_add_outbuf(sq-&gt;vq, sq-&gt;sg, num_sg, skb, GFP_ATOMIC);进入vring操作阶段。<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * virtqueue_add_outbuf - expose output buffers to other end</span></span><br><span class="line"><span class="comment"> * @vq: the struct virtqueue we're talking about.</span></span><br><span class="line"><span class="comment"> * @sgs: array of scatterlists (need not be terminated!)</span></span><br><span class="line"><span class="comment"> * @num: the number of scatterlists readable by other side</span></span><br><span class="line"><span class="comment"> * @data: the token identifying the buffer.</span></span><br><span class="line"><span class="comment"> * @gfp: how to do memory allocations (if necessary).</span></span><br><span class="line"><span class="comment"> *</span></span><br><span class="line"><span class="comment"> * Caller must ensure we don't call this with other virtqueue operations</span></span><br><span class="line"><span class="comment"> * at the same time (except where noted).</span></span><br><span class="line"><span class="comment"> *</span></span><br><span class="line"><span class="comment"> * Returns zero or a negative error (ie. ENOSPC, ENOMEM).</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">virtqueue_add_outbuf</span><span class="params">(struct virtqueue *vq,</span></span></span><br><span class="line"><span class="function"><span class="params">    struct scatterlist sg[], <span class="keyword">unsigned</span> <span class="keyword">int</span> num,</span></span></span><br><span class="line"><span class="function"><span class="params">    <span class="keyword">void</span> *data,</span></span></span><br><span class="line"><span class="function"><span class="params">    <span class="keyword">gfp_t</span> gfp)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line"> 	<span class="keyword">return</span> virtqueue_add(vq, &amp;sg, sg_next_arr, num, <span class="number">0</span>, <span class="number">1</span>, <span class="number">0</span>, data, gfp);</span><br><span class="line">&#125;</span><br><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">inline</span> <span class="keyword">int</span> <span class="title">virtqueue_add</span><span class="params">(struct virtqueue *_vq,</span></span></span><br><span class="line"><span class="function"><span class="params">    struct scatterlist *sgs[],</span></span></span><br><span class="line"><span class="function"><span class="params">    struct scatterlist *(*next)</span></span></span><br><span class="line">      (struct scatterlist *, unsigned int *),</span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">int</span> total_out,</span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">int</span> total_in,</span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">int</span> out_sgs,</span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">int</span> in_sgs,</span><br><span class="line">    <span class="keyword">void</span> *data,</span><br><span class="line">    <span class="keyword">gfp_t</span> gfp)</span><br><span class="line">&#123;</span><br><span class="line">   	......</span><br><span class="line">	head = i = vq-&gt;free_head;</span><br><span class="line">   	<span class="keyword">for</span> (n = <span class="number">0</span>; n &lt; out_sgs; n++) &#123;</span><br><span class="line"> 			<span class="keyword">for</span> (sg = sgs[n]; sg; sg = next(sg, &amp;total_out)) &#123;</span><br><span class="line">  				vq-&gt;vring.desc[i].flags = VRING_DESC_F_NEXT;</span><br><span class="line">  				vq-&gt;vring.desc[i].addr = sg_phys(sg);</span><br><span class="line">  				vq-&gt;vring.desc[i].len = sg-&gt;length;</span><br><span class="line">  				prev = i;</span><br><span class="line">  				i = vq-&gt;vring.desc[i].next; <span class="comment">//通过next字段找到下一个可用的desc</span></span><br><span class="line"> 			&#125;</span><br><span class="line">		&#125;</span><br><span class="line"></span><br><span class="line">   	<span class="comment">/* Last one doesn't continue. */</span></span><br><span class="line">		vq-&gt;vring.desc[prev].flags &amp;= ~VRING_DESC_F_NEXT; </span><br><span class="line"></span><br><span class="line">	<span class="comment">/* Update free pointer */</span></span><br><span class="line">		vq-&gt;free_head = i;</span><br><span class="line"></span><br><span class="line">   	<span class="comment">/* Set token. */</span></span><br><span class="line">		vq-&gt;data[head] = data;</span><br><span class="line"></span><br><span class="line">   	<span class="comment">/* Put entry in available array (but don't update avail-&gt;idx until they do sync). */</span></span><br><span class="line">		avail = (vq-&gt;vring.avail-&gt;idx &amp; (vq-&gt;vring.num<span class="number">-1</span>));</span><br><span class="line">		vq-&gt;vring.avail-&gt;ring[avail] = head;</span><br><span class="line">		<span class="comment">/* Descriptors and available array need to be set before we expose the new available array entries. */</span></span><br><span class="line">		virtio_wmb(vq-&gt;weak_barriers);</span><br><span class="line">		vq-&gt;vring.avail-&gt;idx++;</span><br><span class="line">		vq-&gt;num_added++;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<ol>
+<li>从head = i = vq-&gt;free_head;找到第一片可用的desc;</li>
+<li><p>从sg list将需要发送buffer信息读取并填充vring的desc描述符;<br> addr: guest的物理地址<br> len： buffer的长度<br> flags： VRING_DESC_F_NEXT表示该片buffer还有后续片</p>
+</li>
+<li><p>将最后一片占用的desc的flag作下标记，表示buffer片的终结;</p>
+</li>
+<li><p>更新空闲desc的指针;</p>
+</li>
+<li><p>将skb保存在data[]中作为token，用完后再释放；</p>
+</li>
+<li><p>更新avail描述符，将待发送的第一片buffer在desc中的序号写入空闲的avail ring中，并更新avail描述队列的序号等。</p>
+</li>
+</ol>
+<p>网上一幅图可以看到这些操作的关系：</p>
+<p><img src="http://7lrywd.com1.z0.glb.clouddn.com/6.PNG" alt=""></p>
+<p>在start_xmit中，待发送的信息入队列后，使用virtqueue_kick(sq-&gt;vq)通告Host端；<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">bool</span> <span class="title">virtqueue_kick</span><span class="params">(struct virtqueue *vq)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line"> 	<span class="keyword">if</span> (virtqueue_kick_prepare(vq))</span><br><span class="line">  		<span class="keyword">return</span> virtqueue_notify(vq);</span><br><span class="line"> 	<span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">&#125;</span><br><span class="line"><span class="function"><span class="keyword">bool</span> <span class="title">virtqueue_notify</span><span class="params">(struct virtqueue *_vq)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line"> 	<span class="class"><span class="keyword">struct</span> <span class="title">vring_virtqueue</span> *<span class="title">vq</span> = <span class="title">to_vvq</span>(_<span class="title">vq</span>);</span></span><br><span class="line"> 	<span class="keyword">if</span> (unlikely(vq-&gt;broken))</span><br><span class="line">  		<span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line"> 	<span class="comment">/* Prod other side to tell it about changes. */</span></span><br><span class="line"> 	<span class="keyword">if</span> (!vq-&gt;notify(_vq)) &#123;</span><br><span class="line">  		vq-&gt;broken = <span class="literal">true</span>;</span><br><span class="line">  		<span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line"> 	&#125;</span><br><span class="line"> 	<span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>其中vq-&gt;notifynotify即是vring创建时注册的vp_notify。<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">bool</span> <span class="title">vp_notify</span><span class="params">(struct virtqueue *vq)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line"> 	<span class="class"><span class="keyword">struct</span> <span class="title">virtio_pci_device</span> *<span class="title">vp_dev</span> = <span class="title">to_vp_device</span>(<span class="title">vq</span>-&gt;<span class="title">vdev</span>);</span></span><br><span class="line"> 	<span class="comment">/* we write the queue's selector into the notification register to</span></span><br><span class="line"><span class="comment">  	* signal the other end */</span></span><br><span class="line"> 	iowrite16(vq-&gt;index, vp_dev-&gt;ioaddr + VIRTIO_PCI_QUEUE_NOTIFY);</span><br><span class="line"> 	<span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>通过配置VIRTIO_PCI_QUEUE_NOTIFY域来进行通告。接下来就是HOST一端的处理了。从整个前端发送流程可以看出，一个数据包发送时只是将skb的地址及长度等信息通告了virtio driver，而vring的空间是和后端共享的，所以该传输过程为零拷贝，这也是virtio高性能的一个原因。</p>
+
+        
+        </div>
+        <footer class="article-footer">
+            <div class="share-container">
+
+
+
+</div>
+
+    <a data-url="http://royhunter.github.io/2014/08/09/virtio-netdev-send/" data-id="ck2oe6fqq0047xkkvsfsjimi8" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+<script>
+    (function ($) {
+        // Prevent duplicate binding
+        if (typeof(__SHARE_BUTTON_BINDED__) === 'undefined' || !__SHARE_BUTTON_BINDED__) {
+            __SHARE_BUTTON_BINDED__ = true;
+        } else {
+            return;
+        }
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url'),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="fab fa-twitter article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="fab fa-facebook article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="fab fa-pinterest article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                            '<a href="https://plus.google.com/share?url=' + encodedUrl + '" class="fab fa-google article-share-google" target="_blank" title="Google+"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+            
+    
+
+        </footer>
+    </div>
+    
+        
+<nav id="article-nav">
+    
+        <a href="/2014/08/22/vhost/" id="article-nav-newer" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Newer</strong>
+            <div class="article-nav-title">
+                
+                    Vhost Architecture
+                
+            </div>
+        </a>
+    
+    
+        <a href="/2014/08/08/virtio-virtqueue/" id="article-nav-older" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Older</strong>
+            <div class="article-nav-title">Virtio----Vring Introduce</div>
+        </a>
+    
+</nav>
+
+
+    
+</article>
+
+
+    
+    
+
+</section>
+            
+                
+<aside id="sidebar">
+   
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">recent</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2020/07/12/index/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"></p>
+                            <p class="item-title"><a href="/2020/07/12/index/" class="title">Blog索引</a></p>
+                            <p class="item-date"><time datetime="2020-07-12T13:33:28.000Z" itemprop="datePublished">2020-07-12</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/07/17/ovs02-vxlan/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/07/17/ovs02-vxlan/" class="title">OVS02-VXLAN内核相关实现</a></p>
+                            <p class="item-date"><time datetime="2018-07-17T12:15:34.000Z" itemprop="datePublished">2018-07-17</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/01/10/perf-tunning/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/01/10/perf-tunning/" class="title">datapath性能优化总结</a></p>
+                            <p class="item-date"><time datetime="2018-01-10T13:26:32.000Z" itemprop="datePublished">2018-01-10</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2017/04/18/ovs01/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2017/04/18/ovs01/" class="title">OVS01-OVS基础-安装、配置、Simple Case</a></p>
+                            <p class="item-date"><time datetime="2017-04-18T13:26:32.000Z" itemprop="datePublished">2017-04-18</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2016/08/28/trampolines-for-nested-functions/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Programme/">Programme</a></p>
+                            <p class="item-title"><a href="/2016/08/28/trampolines-for-nested-functions/" class="title">Trampolines for Nested Functions in GCC</a></p>
+                            <p class="item-date"><time datetime="2016-08-28T13:26:32.000Z" itemprop="datePublished">2016-08-28</time></p>
+                        </div>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">categories</h3>
+        <div class="widget">
+            <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Algorithm/">Algorithm</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Container/">Container</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Docker/">Docker</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Hyper-V/">Hyper-V</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/KVM/">KVM</a><span class="category-list-count">22</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Misc/">Misc</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/PROGRAMME/">PROGRAMME</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Programme/">Programme</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Virtualization/">Virtualization</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/go/">go</a><span class="category-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">archives</h3>
+        <div class="widget">
+            <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">July 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">July 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">January 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">April 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">August 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/06/">June 2016</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/05/">May 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/03/">March 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/02/">February 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/01/">January 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/12/">December 2015</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/11/">November 2015</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/08/">August 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/07/">July 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/06/">June 2014</a><span class="archive-list-count">5</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tags</h3>
+        <div class="widget">
+            <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Container/">Container</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Distribute/">Distribute</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/EPT/">EPT</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux-namespace/">Linux namespace</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Network/">Network</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/PROGRAMME/">PROGRAMME</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Programme-Language/">Programme Language</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/QEMU/">QEMU</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Tools/">Tools</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization/">Virtualization</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization-KVM-QEMU/">Virtualization KVM QEMU</a><span class="tag-list-count">9</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/libvirt/">libvirt</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vhost/">vhost</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/virtio/">virtio</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vps-proxy/">vps_proxy</a><span class="tag-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tag cloud</h3>
+        <div class="widget tagcloud">
+            <a href="/tags/Container/" style="font-size: 12.5px;">Container</a> <a href="/tags/Distribute/" style="font-size: 12.5px;">Distribute</a> <a href="/tags/EPT/" style="font-size: 12.5px;">EPT</a> <a href="/tags/Linux-namespace/" style="font-size: 12.5px;">Linux namespace</a> <a href="/tags/Network/" style="font-size: 15px;">Network</a> <a href="/tags/PROGRAMME/" style="font-size: 10px;">PROGRAMME</a> <a href="/tags/Programme-Language/" style="font-size: 10px;">Programme Language</a> <a href="/tags/QEMU/" style="font-size: 12.5px;">QEMU</a> <a href="/tags/Tools/" style="font-size: 12.5px;">Tools</a> <a href="/tags/Virtualization/" style="font-size: 17.5px;">Virtualization</a> <a href="/tags/Virtualization-KVM-QEMU/" style="font-size: 20px;">Virtualization KVM QEMU</a> <a href="/tags/libvirt/" style="font-size: 10px;">libvirt</a> <a href="/tags/vhost/" style="font-size: 10px;">vhost</a> <a href="/tags/virtio/" style="font-size: 17.5px;">virtio</a> <a href="/tags/vps-proxy/" style="font-size: 10px;">vps_proxy</a>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">links</h3>
+        <div class="widget">
+            <ul>
+                
+                    <li>
+                        <a href="http://hexo.io">Hexo</a>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+
+    
+    <div id="toTop" class="fas fa-angle-up"></div>
+</aside>
+
+            
+        </div>
+        <footer id="footer">
+    <div class="outer">
+        <div id="footer-info" class="inner">
+            &copy; 2019 John Doe<br>
+            Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>. Theme by <a href="http://github.com/ppoffice">PPOffice</a>
+        </div>
+    </div>
+</footer>
+        
+
+
+    
+        <script src="/libs/lightgallery/js/lightgallery.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-thumbnail.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-pager.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-autoplay.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-fullscreen.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-zoom.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-hash.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-share.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-video.min.js"></script>
+    
+    
+        <script src="/libs/justified-gallery/jquery.justifiedGallery.min.js"></script>
+    
+    
+
+
+
+<!-- Custom Scripts -->
+<script src="/js/main.js"></script>
+
+    </div>
+</body>
+</html>

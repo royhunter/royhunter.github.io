@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <meta charset="utf-8">
+    
+    <title>中断虚拟化一 | RoyLuo&#39;s Notes</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="description" content="一个操作系统要跑起来，必须有Time Tick，它就像是身体的脉搏。普通情况下，OS Time Tick由PIT(i8254)或APIC Timer设备提供—PIT定期(1ms in Linux)产生一个timer interrupt，作为global tick, APIC Timer产生一个local tick。在虚拟化情况下，必须为guest OS模拟一个PIT和APIC Timer。模拟的P">
+<meta name="keywords" content="Virtualization">
+<meta property="og:type" content="article">
+<meta property="og:title" content="中断虚拟化一">
+<meta property="og:url" content="http://royhunter.github.io/2015/11/20/interrupt-virtualization/index.html">
+<meta property="og:site_name" content="RoyLuo&#39;s Notes">
+<meta property="og:description" content="一个操作系统要跑起来，必须有Time Tick，它就像是身体的脉搏。普通情况下，OS Time Tick由PIT(i8254)或APIC Timer设备提供—PIT定期(1ms in Linux)产生一个timer interrupt，作为global tick, APIC Timer产生一个local tick。在虚拟化情况下，必须为guest OS模拟一个PIT和APIC Timer。模拟的P">
+<meta property="og:locale" content="en">
+<meta property="og:updated_time" content="2016-06-25T04:06:14.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="中断虚拟化一">
+<meta name="twitter:description" content="一个操作系统要跑起来，必须有Time Tick，它就像是身体的脉搏。普通情况下，OS Time Tick由PIT(i8254)或APIC Timer设备提供—PIT定期(1ms in Linux)产生一个timer interrupt，作为global tick, APIC Timer产生一个local tick。在虚拟化情况下，必须为guest OS模拟一个PIT和APIC Timer。模拟的P">
+    
+
+    
+        <link rel="alternate" href="atom.xml" title="RoyLuo&#39;s Notes" type="application/atom+xml" />
+    
+
+    
+
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fontawesome.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-brands.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-solid.min.css">
+    <link rel="stylesheet" href="/libs/open-sans/styles.css">
+    <link rel="stylesheet" href="/libs/source-code-pro/styles.css">
+
+    <link rel="stylesheet" href="/css/style.css">
+
+    <script src="/libs/jquery/2.1.3/jquery.min.js"></script>
+    
+    
+        <link rel="stylesheet" href="/libs/lightgallery/css/lightgallery.min.css">
+    
+    
+        <link rel="stylesheet" href="/libs/justified-gallery/justifiedGallery.min.css">
+    
+    
+    
+    
+
+
+</head>
+
+<body>
+    <div id="container">
+        <header id="header">
+    <div id="header-main" class="header-inner">
+        <div class="outer">
+            <a href="/" id="logo">
+                <i class="logo"></i>
+                <span class="site-title">RoyLuo&#39;s Notes</span>
+            </a>
+            <nav id="main-nav">
+                
+                    <a class="main-nav-link" href="/.">Home</a>
+                
+                    <a class="main-nav-link" href="/archives">Archives</a>
+                
+                    <a class="main-nav-link" href="/categories">Categories</a>
+                
+                    <a class="main-nav-link" href="/tags">Tags</a>
+                
+                    <a class="main-nav-link" href="/proj">Projects</a>
+                
+                    <a class="main-nav-link" href="/book">Books</a>
+                
+                    <a class="main-nav-link" href="/about">About</a>
+                
+            </nav>
+            
+                
+                <nav id="sub-nav">
+                    <div class="profile" id="profile-nav">
+                        <a id="profile-anchor" href="javascript:;">
+                            <img class="avatar" src="/css/images/image_y.png" />
+                            <i class="fas fa-caret-down"></i>
+                        </a>
+                    </div>
+                </nav>
+            
+            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+        <button type="submit" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" placeholder="Type something..." />
+            <span class="ins-close ins-selectable"><i class="fas fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script>
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: 'Posts',
+            PAGES: 'Pages',
+            CATEGORIES: 'Categories',
+            TAGS: 'Tags',
+            UNTITLED: '(Untitled)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+<script src="/js/insight.js"></script>
+
+</div>
+        </div>
+    </div>
+    <div id="main-nav-mobile" class="header-sub header-inner">
+        <table class="menu outer">
+            <tr>
+                
+                    <td><a class="main-nav-link" href="/.">Home</a></td>
+                
+                    <td><a class="main-nav-link" href="/archives">Archives</a></td>
+                
+                    <td><a class="main-nav-link" href="/categories">Categories</a></td>
+                
+                    <td><a class="main-nav-link" href="/tags">Tags</a></td>
+                
+                    <td><a class="main-nav-link" href="/proj">Projects</a></td>
+                
+                    <td><a class="main-nav-link" href="/book">Books</a></td>
+                
+                    <td><a class="main-nav-link" href="/about">About</a></td>
+                
+                <td>
+                    
+    <div class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+    </div>
+
+                </td>
+            </tr>
+        </table>
+    </div>
+</header>
+
+        <div class="outer">
+            
+                
+
+<aside id="profile" class="profile-fixed">
+    <div class="inner profile-inner">
+        <div class="base-info profile-block">
+            <img id="avatar" src="/css/images/image_y.png" />
+            <h2 id="name">Roy Luo</h2>
+            <h3 id="title">Designer &amp; Developer</h3>
+            <span id="location"><i class="fas fa-map-marker-alt" style="padding-right: 5px"></i>Beijing, China</span>
+            <a id="follow" target="_blank" href="https://github.com/royhunter/">FOLLOW</a>
+        </div>
+        <div class="article-info profile-block">
+            <div class="article-info-block">
+                43
+                <span>posts</span>
+            </div>
+            <div class="article-info-block">
+                15
+                <span>tags</span>
+            </div>
+        </div>
+        
+        <div class="profile-block social-links">
+            <table>
+                <tr>
+                    
+                    
+                    <td>
+                        <a href="http://github.com/royhunter/" target="_blank" title="github" class=tooltip>
+                            <i class="fab fa-github"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://twitter.com/RoyLuoye" target="_blank" title="twitter" class=tooltip>
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://www.facebook/roy.luo.3367" target="_blank" title="facebook" class=tooltip>
+                            <i class="fab fa-facebook"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://cn.linkedin.com/in/royluoye" target="_blank" title="linkedin" class=tooltip>
+                            <i class="fab fa-linkedin"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="/atom.xml" target="_blank" title="rss" class=tooltip>
+                            <i class="fab fa-rss"></i>
+                        </a>
+                    </td>
+                    
+                </tr>
+            </table>
+        </div>
+        
+    </div>
+</aside>
+
+            
+            <section id="main"><article id="post-interrupt-virtualization" class="article article-type-post" itemscope itemprop="blogPost">
+    <div class="article-inner">
+        
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+            中断虚拟化一
+        </h1>
+    
+
+                
+                    <div class="article-meta">
+                        
+    <div class="article-date">
+        <i class="fas fa-calendar-alt"></i>
+        <a href="/2015/11/20/interrupt-virtualization/">
+            <time datetime="2015-11-20T15:14:04.000Z" itemprop="datePublished">2015-11-20</time>
+        </a>
+    </div>
+
+
+                        
+    <div class="article-category">
+    	<i class="fas fa-folder"></i>
+        <a class="article-category-link" href="/categories/KVM/">KVM</a>
+    </div>
+
+                        
+    <div class="article-tag">
+        <i class="fas fa-tag"></i>
+        <a class="tag-link" href="/tags/Virtualization/">Virtualization</a>
+    </div>
+
+                    </div>
+                
+            </header>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+        
+            
+            <p>一个操作系统要跑起来，必须有Time Tick，它就像是身体的脉搏。普通情况下，OS Time Tick由PIT(i8254)或APIC Timer设备提供—PIT定期(1ms in Linux)产生一个timer interrupt，作为global tick, APIC Timer产生一个local tick。在虚拟化情况下，必须为guest OS模拟一个PIT和APIC Timer。<br>模拟的PIT和APIC Timer不能像真正硬件那样物理计时，所以一般用HOST的某种系统服务或软件计时器来为这个模拟PIT提供模拟”时钟源”。<br>目前两种方案：1. 用户态模拟方案（QEMU）； 2. 内核态模拟方案（KVM）；</p>
+<a id="more"></a>
+<h2 id="引言"><a href="#引言" class="headerlink" title="引言"></a>引言</h2><p>一个操作系统要跑起来，必须有Time Tick，它就像是身体的脉搏。普通情况下，OS Time Tick由PIT(i8254)或APIC Timer设备提供—PIT定期(1ms in Linux)产生一个timer interrupt，作为global tick, APIC Timer产生一个local tick。在虚拟化情况下，必须为guest OS模拟一个PIT和APIC Timer。<br>模拟的PIT和APIC Timer不能像真正硬件那样物理计时，所以一般用HOST的某种系统服务或软件计时器来为这个模拟PIT提供模拟”时钟源”。<br>目前两种方案：1. 用户态模拟方案（QEMU）； 2. 内核态模拟方案（KVM）；<br>在QEMU中，用SIGALARM信号来实现：QEMU利用某种机制，使timer interrupt handler会向QEMU process发送一个SIGALARM信号，处理该信号过程中再模拟PIT中产生一次时钟。QEMU再通过某种机制，将此模拟PIT发出的模拟中断交付给kvm，再由kvm注入到虚拟机中去。<br>目前的kvm版本支持内核PIT、APIC和内核PIC，因为这两个设备是频繁使用的，在内核模式中模拟比在用户模式模拟性能更高。这里重点是讲内核PIT的模拟实现，弄清楚它是如何为guest OS提供时钟的。</p>
+<h2 id="相关代码"><a href="#相关代码" class="headerlink" title="相关代码"></a>相关代码</h2><p>主要涉及本主题讨论的代码为：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">linux/arch/x86/kvm/i8254.c</span><br><span class="line">linux/arch/x86/kvm/i8254.h</span><br><span class="line">linux/arch/x86/kvm/i8259.c</span><br><span class="line">linux/arch/x86/kvm/irq.c</span><br><span class="line">linux/arch/x86/kvm/irq.h</span><br><span class="line">linux/virt/kvm/irq_comm.c</span><br></pre></td></tr></table></figure>
+<h2 id="物理芯片介绍"><a href="#物理芯片介绍" class="headerlink" title="物理芯片介绍"></a>物理芯片介绍</h2><ol>
+<li>PIT 主要为Intel 8254 PIT芯片；<br>PIT (Programmable Interval Timer)  可编程间隔定时器<br>每个PC机中都有一个PIT，通过IRQ产生周期性的时钟中断信号来充当系统定时器。<br>i386中使用的通常是Intel 8254 PIT芯片，它的I/O端口地址范围是40h～43h。<br>8254 PIT有3个计时通道，每个通道都有其不同的用途：<br>通道0用来负责更新系统时钟。它在每一个时钟滴答会通过IRQ0向系统发出一次时钟中断信号。<br>通道1通常用于控制DMAC对RAM的刷新。<br>通道2被连接到PC机的扬声器，以产生方波信号。</li>
+<li>PIC主要为8259A PIC芯片；<br>PIC(Programmable Interrupt Controller) 可编程中断控制器<br>它具有IR0~IR7共8个中断管脚连接外部设备。中断管脚具有优先级，其中IR0优先级最高，IR7最低。PIC有三个重要的寄存器：<br>（1）    IRR Interrupt Request Register, 中断请求寄存器 共8位，对应IR0~IR7这8个中断管脚。某位置1代表收到对应管脚的中断但还未提交给CPU。<br>（2）    ISR In Service Register 服务中寄存器：共8位，某位置1代表对应管脚的中断已经提交给CPU处理，但CPU还未处理完。<br>（3）    IMR Interrupt Mask Register 中断屏蔽寄存器：共8位，某位置1对应的中断管脚被屏蔽。</li>
+</ol>
+<h2 id="实现"><a href="#实现" class="headerlink" title="实现"></a>实现</h2><h3 id="创建流程"><a href="#创建流程" class="headerlink" title="创建流程"></a>创建流程</h3><p>QEMU中创建入口：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">kvm_vm_ioctl(s, KVM_CREATE_IRQCHIP)    (kvm-all.c)</span><br><span class="line">kvm_vm_ioctl(kvm_state, KVM_CREATE_PIT)（i8254.c）</span><br></pre></td></tr></table></figure>
+<h3 id="虚拟PIC的创建"><a href="#虚拟PIC的创建" class="headerlink" title="虚拟PIC的创建"></a>虚拟PIC的创建</h3><p>首先看KVM_CREATE_IRQCHIP：<br>对应内核代码为：kvm_arch_vm_ioctl（） case KVM_CREATE_IRQCHIP</p>
+<h4 id="第一步："><a href="#第一步：" class="headerlink" title="第一步："></a>第一步：</h4><p>vpic = kvm_create_pic()</p>
+<ol>
+<li>s = kzalloc(sizeof(struct kvm_pic), GFP_KERNEL);  创建kvm_pic结构；</li>
+<li>s-&gt;irq_request = pic_irq_request;   注册pic_irq_request中断请求函数；</li>
+<li>kvm_iodevice_init(&amp;s-&gt;dev, &amp;picdev_ops);  注册PIC dev的IO端口读写函数；<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> <span class="keyword">const</span> <span class="class"><span class="keyword">struct</span> <span class="title">kvm_io_device_ops</span> <span class="title">picdev_ops</span> = &#123;</span></span><br><span class="line">	.read     = picdev_read,</span><br><span class="line">	.write    = picdev_write,</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+</li>
+</ol>
+<p>读写函数的进去第一句话即时判断读写地址是否属于本picdev的；picdev_in_range()</p>
+<ol start="4">
+<li>kvm_io_bus_register_dev(kvm, KVM_PIO_BUS, &amp;s-&gt;dev); 注册了PIO型的bus访问形式；另一种IO形式为MMIO；<br>kvm-&gt;arch.vpic = vpic; 返回值vpic赋给了kvm的arch.vpic结构；</li>
+</ol>
+<h4 id="第二步："><a href="#第二步：" class="headerlink" title="第二步："></a>第二步：</h4><p>r = kvm_ioapic_init(kvm); 初始化ioapic<br>ioapic使用的是kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, &amp;ioapic-&gt;dev);</p>
+<h4 id="第三步："><a href="#第三步：" class="headerlink" title="第三步："></a>第三步：</h4><p>r = kvm_setup_default_irq_routing(kvm); 设置默认的irq路由 （irq_comm.c）<br>Time Tick占用irq0<br>安装中断路由函数主要在setup_routing_entry中<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">case</span> KVM_IRQCHIP_PIC_MASTER:</span><br><span class="line">			e-&gt;<span class="built_in">set</span> = kvm_set_pic_irq; 相当于中断路由函数</span><br><span class="line">			max_pin = <span class="number">16</span>;</span><br><span class="line">			<span class="keyword">break</span>;</span><br></pre></td></tr></table></figure></p>
+<p>虚拟PIC创建流程到此为止；</p>
+<h3 id="虚拟PIT的创建"><a href="#虚拟PIT的创建" class="headerlink" title="虚拟PIT的创建"></a>虚拟PIT的创建</h3><h4 id="第一步：-1"><a href="#第一步：-1" class="headerlink" title="第一步："></a>第一步：</h4><p>struct kvm_pit *pit = kzalloc()      申请kvm_pit结构,代表一个PIT外设；</p>
+<h4 id="第二步：-1"><a href="#第二步：-1" class="headerlink" title="第二步："></a>第二步：</h4><p>pit-&gt;irq_source_id = kvm_request_irq_source_id(kvm); 申请中断资源号<br>kvm-&gt;arch.vpit = pit;         赋予kvm的vpit；<br>pit-&gt;kvm = kvm;</p>
+<h4 id="第三步：-1"><a href="#第三步：-1" class="headerlink" title="第三步："></a>第三步：</h4><p>hrtimer_init(&amp;pit_state-&gt;pit_timer.timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS); 高精度定时器初始化</p>
+<h4 id="第四步："><a href="#第四步：" class="headerlink" title="第四步："></a>第四步：</h4><p>kvm_register_irq_ack_notifier(kvm, &amp;pit_state-&gt;irq_ack_notifier);<br>注册该pit的irq ack notifier</p>
+<h4 id="第五步："><a href="#第五步：" class="headerlink" title="第五步："></a>第五步：</h4><p>kvm_pit_reset(pit);——- &gt;pit_load_count() ———- &gt; create_pit_timer():<br>pt-&gt;timer.function = kvm_timer_fn;<br>hrtimer_start(&amp;pt-&gt;timer, ktime_add_ns(ktime_get(), interval),<br>              HRTIMER_MODE_ABS);<br>到这里：内核虚拟PIT实际是利用HOST的hrtimer实际时钟源来提供虚拟时钟的。  Hrtimer为 高精度定时器，管理机制为:传统的低精度的为时间轮方案； 高精度方案为红黑树管理方案；此处注册的时间为1ms一次，并为周期性的；注册的中断处理函数kvm_timer_fn;</p>
+<h4 id="第六步："><a href="#第六步：" class="headerlink" title="第六步："></a>第六步：</h4><p>kvm_io_bus_register_dev(kvm, KVM_PIO_BUS, &amp;pit-&gt;dev);  注册PIO型设备；<br>至此PIT也创建完成；</p>
+<p>未完待续……</p>
+
+        
+        </div>
+        <footer class="article-footer">
+            <div class="share-container">
+
+
+
+</div>
+
+    <a data-url="http://royhunter.github.io/2015/11/20/interrupt-virtualization/" data-id="ck2oe6fnz001axkkvvp1o5j8x" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+<script>
+    (function ($) {
+        // Prevent duplicate binding
+        if (typeof(__SHARE_BUTTON_BINDED__) === 'undefined' || !__SHARE_BUTTON_BINDED__) {
+            __SHARE_BUTTON_BINDED__ = true;
+        } else {
+            return;
+        }
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url'),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="fab fa-twitter article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="fab fa-facebook article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="fab fa-pinterest article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                            '<a href="https://plus.google.com/share?url=' + encodedUrl + '" class="fab fa-google article-share-google" target="_blank" title="Google+"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+            
+    
+
+        </footer>
+    </div>
+    
+        
+<nav id="article-nav">
+    
+        <a href="/2015/11/20/interrupt-virtualization2/" id="article-nav-newer" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Newer</strong>
+            <div class="article-nav-title">
+                
+                    中断虚拟化二
+                
+            </div>
+        </a>
+    
+    
+        <a href="/2015/11/19/libvirt1/" id="article-nav-older" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Older</strong>
+            <div class="article-nav-title">Libvirt Introduce</div>
+        </a>
+    
+</nav>
+
+
+    
+</article>
+
+
+    
+    
+
+</section>
+            
+                
+<aside id="sidebar">
+   
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">recent</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2020/07/12/index/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"></p>
+                            <p class="item-title"><a href="/2020/07/12/index/" class="title">Blog索引</a></p>
+                            <p class="item-date"><time datetime="2020-07-12T13:33:28.000Z" itemprop="datePublished">2020-07-12</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/07/17/ovs02-vxlan/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/07/17/ovs02-vxlan/" class="title">OVS02-VXLAN内核相关实现</a></p>
+                            <p class="item-date"><time datetime="2018-07-17T12:15:34.000Z" itemprop="datePublished">2018-07-17</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/01/10/perf-tunning/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/01/10/perf-tunning/" class="title">datapath性能优化总结</a></p>
+                            <p class="item-date"><time datetime="2018-01-10T13:26:32.000Z" itemprop="datePublished">2018-01-10</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2017/04/18/ovs01/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2017/04/18/ovs01/" class="title">OVS01-OVS基础-安装、配置、Simple Case</a></p>
+                            <p class="item-date"><time datetime="2017-04-18T13:26:32.000Z" itemprop="datePublished">2017-04-18</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2016/08/28/trampolines-for-nested-functions/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Programme/">Programme</a></p>
+                            <p class="item-title"><a href="/2016/08/28/trampolines-for-nested-functions/" class="title">Trampolines for Nested Functions in GCC</a></p>
+                            <p class="item-date"><time datetime="2016-08-28T13:26:32.000Z" itemprop="datePublished">2016-08-28</time></p>
+                        </div>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">categories</h3>
+        <div class="widget">
+            <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Algorithm/">Algorithm</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Container/">Container</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Docker/">Docker</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Hyper-V/">Hyper-V</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/KVM/">KVM</a><span class="category-list-count">22</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Misc/">Misc</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/PROGRAMME/">PROGRAMME</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Programme/">Programme</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Virtualization/">Virtualization</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/go/">go</a><span class="category-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">archives</h3>
+        <div class="widget">
+            <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">July 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">July 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">January 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">April 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">August 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/06/">June 2016</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/05/">May 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/03/">March 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/02/">February 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/01/">January 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/12/">December 2015</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/11/">November 2015</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/08/">August 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/07/">July 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/06/">June 2014</a><span class="archive-list-count">5</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tags</h3>
+        <div class="widget">
+            <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Container/">Container</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Distribute/">Distribute</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/EPT/">EPT</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux-namespace/">Linux namespace</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Network/">Network</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/PROGRAMME/">PROGRAMME</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Programme-Language/">Programme Language</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/QEMU/">QEMU</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Tools/">Tools</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization/">Virtualization</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization-KVM-QEMU/">Virtualization KVM QEMU</a><span class="tag-list-count">9</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/libvirt/">libvirt</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vhost/">vhost</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/virtio/">virtio</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vps-proxy/">vps_proxy</a><span class="tag-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tag cloud</h3>
+        <div class="widget tagcloud">
+            <a href="/tags/Container/" style="font-size: 12.5px;">Container</a> <a href="/tags/Distribute/" style="font-size: 12.5px;">Distribute</a> <a href="/tags/EPT/" style="font-size: 12.5px;">EPT</a> <a href="/tags/Linux-namespace/" style="font-size: 12.5px;">Linux namespace</a> <a href="/tags/Network/" style="font-size: 15px;">Network</a> <a href="/tags/PROGRAMME/" style="font-size: 10px;">PROGRAMME</a> <a href="/tags/Programme-Language/" style="font-size: 10px;">Programme Language</a> <a href="/tags/QEMU/" style="font-size: 12.5px;">QEMU</a> <a href="/tags/Tools/" style="font-size: 12.5px;">Tools</a> <a href="/tags/Virtualization/" style="font-size: 17.5px;">Virtualization</a> <a href="/tags/Virtualization-KVM-QEMU/" style="font-size: 20px;">Virtualization KVM QEMU</a> <a href="/tags/libvirt/" style="font-size: 10px;">libvirt</a> <a href="/tags/vhost/" style="font-size: 10px;">vhost</a> <a href="/tags/virtio/" style="font-size: 17.5px;">virtio</a> <a href="/tags/vps-proxy/" style="font-size: 10px;">vps_proxy</a>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">links</h3>
+        <div class="widget">
+            <ul>
+                
+                    <li>
+                        <a href="http://hexo.io">Hexo</a>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+
+    
+    <div id="toTop" class="fas fa-angle-up"></div>
+</aside>
+
+            
+        </div>
+        <footer id="footer">
+    <div class="outer">
+        <div id="footer-info" class="inner">
+            &copy; 2019 John Doe<br>
+            Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>. Theme by <a href="http://github.com/ppoffice">PPOffice</a>
+        </div>
+    </div>
+</footer>
+        
+
+
+    
+        <script src="/libs/lightgallery/js/lightgallery.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-thumbnail.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-pager.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-autoplay.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-fullscreen.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-zoom.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-hash.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-share.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-video.min.js"></script>
+    
+    
+        <script src="/libs/justified-gallery/jquery.justifiedGallery.min.js"></script>
+    
+    
+
+
+
+<!-- Custom Scripts -->
+<script src="/js/main.js"></script>
+
+    </div>
+</body>
+</html>

@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <meta charset="utf-8">
+    
+    <title>Network Namespace | RoyLuo&#39;s Notes</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="description" content="周末学习了针对网络相关的Linux Namespace模块，搜罗了一些资料，搭建了小小的测试环境，查阅了一些源码实现，此处做了下小小的笔记。">
+<meta name="keywords" content="Linux namespace">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Network Namespace">
+<meta property="og:url" content="http://royhunter.github.io/2015/12/13/netns/index.html">
+<meta property="og:site_name" content="RoyLuo&#39;s Notes">
+<meta property="og:description" content="周末学习了针对网络相关的Linux Namespace模块，搜罗了一些资料，搭建了小小的测试环境，查阅了一些源码实现，此处做了下小小的笔记。">
+<meta property="og:locale" content="en">
+<meta property="og:image" content="http://7xoxkz.com1.z0.glb.clouddn.com/4.png">
+<meta property="og:updated_time" content="2015-12-13T13:24:44.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Network Namespace">
+<meta name="twitter:description" content="周末学习了针对网络相关的Linux Namespace模块，搜罗了一些资料，搭建了小小的测试环境，查阅了一些源码实现，此处做了下小小的笔记。">
+<meta name="twitter:image" content="http://7xoxkz.com1.z0.glb.clouddn.com/4.png">
+    
+
+    
+        <link rel="alternate" href="atom.xml" title="RoyLuo&#39;s Notes" type="application/atom+xml" />
+    
+
+    
+
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fontawesome.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-brands.min.css">
+    <link rel="stylesheet" href="/libs/font-awesome5/css/fa-solid.min.css">
+    <link rel="stylesheet" href="/libs/open-sans/styles.css">
+    <link rel="stylesheet" href="/libs/source-code-pro/styles.css">
+
+    <link rel="stylesheet" href="/css/style.css">
+
+    <script src="/libs/jquery/2.1.3/jquery.min.js"></script>
+    
+    
+        <link rel="stylesheet" href="/libs/lightgallery/css/lightgallery.min.css">
+    
+    
+        <link rel="stylesheet" href="/libs/justified-gallery/justifiedGallery.min.css">
+    
+    
+    
+    
+
+
+</head>
+
+<body>
+    <div id="container">
+        <header id="header">
+    <div id="header-main" class="header-inner">
+        <div class="outer">
+            <a href="/" id="logo">
+                <i class="logo"></i>
+                <span class="site-title">RoyLuo&#39;s Notes</span>
+            </a>
+            <nav id="main-nav">
+                
+                    <a class="main-nav-link" href="/.">Home</a>
+                
+                    <a class="main-nav-link" href="/archives">Archives</a>
+                
+                    <a class="main-nav-link" href="/categories">Categories</a>
+                
+                    <a class="main-nav-link" href="/tags">Tags</a>
+                
+                    <a class="main-nav-link" href="/proj">Projects</a>
+                
+                    <a class="main-nav-link" href="/book">Books</a>
+                
+                    <a class="main-nav-link" href="/about">About</a>
+                
+            </nav>
+            
+                
+                <nav id="sub-nav">
+                    <div class="profile" id="profile-nav">
+                        <a id="profile-anchor" href="javascript:;">
+                            <img class="avatar" src="/css/images/image_y.png" />
+                            <i class="fas fa-caret-down"></i>
+                        </a>
+                    </div>
+                </nav>
+            
+            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+        <button type="submit" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" placeholder="Type something..." />
+            <span class="ins-close ins-selectable"><i class="fas fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script>
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: 'Posts',
+            PAGES: 'Pages',
+            CATEGORIES: 'Categories',
+            TAGS: 'Tags',
+            UNTITLED: '(Untitled)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+<script src="/js/insight.js"></script>
+
+</div>
+        </div>
+    </div>
+    <div id="main-nav-mobile" class="header-sub header-inner">
+        <table class="menu outer">
+            <tr>
+                
+                    <td><a class="main-nav-link" href="/.">Home</a></td>
+                
+                    <td><a class="main-nav-link" href="/archives">Archives</a></td>
+                
+                    <td><a class="main-nav-link" href="/categories">Categories</a></td>
+                
+                    <td><a class="main-nav-link" href="/tags">Tags</a></td>
+                
+                    <td><a class="main-nav-link" href="/proj">Projects</a></td>
+                
+                    <td><a class="main-nav-link" href="/book">Books</a></td>
+                
+                    <td><a class="main-nav-link" href="/about">About</a></td>
+                
+                <td>
+                    
+    <div class="search-form">
+        <input type="text" class="ins-search-input search-form-input" placeholder="Search" />
+    </div>
+
+                </td>
+            </tr>
+        </table>
+    </div>
+</header>
+
+        <div class="outer">
+            
+                
+
+<aside id="profile" class="profile-fixed">
+    <div class="inner profile-inner">
+        <div class="base-info profile-block">
+            <img id="avatar" src="/css/images/image_y.png" />
+            <h2 id="name">Roy Luo</h2>
+            <h3 id="title">Designer &amp; Developer</h3>
+            <span id="location"><i class="fas fa-map-marker-alt" style="padding-right: 5px"></i>Beijing, China</span>
+            <a id="follow" target="_blank" href="https://github.com/royhunter/">FOLLOW</a>
+        </div>
+        <div class="article-info profile-block">
+            <div class="article-info-block">
+                43
+                <span>posts</span>
+            </div>
+            <div class="article-info-block">
+                15
+                <span>tags</span>
+            </div>
+        </div>
+        
+        <div class="profile-block social-links">
+            <table>
+                <tr>
+                    
+                    
+                    <td>
+                        <a href="http://github.com/royhunter/" target="_blank" title="github" class=tooltip>
+                            <i class="fab fa-github"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://twitter.com/RoyLuoye" target="_blank" title="twitter" class=tooltip>
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://www.facebook/roy.luo.3367" target="_blank" title="facebook" class=tooltip>
+                            <i class="fab fa-facebook"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="https://cn.linkedin.com/in/royluoye" target="_blank" title="linkedin" class=tooltip>
+                            <i class="fab fa-linkedin"></i>
+                        </a>
+                    </td>
+                    
+                    <td>
+                        <a href="/atom.xml" target="_blank" title="rss" class=tooltip>
+                            <i class="fab fa-rss"></i>
+                        </a>
+                    </td>
+                    
+                </tr>
+            </table>
+        </div>
+        
+    </div>
+</aside>
+
+            
+            <section id="main"><article id="post-netns" class="article article-type-post" itemscope itemprop="blogPost">
+    <div class="article-inner">
+        
+            
+	
+		<img src="http://7xoxkz.com1.z0.glb.clouddn.com/4.png" class="article-banner" />
+	
+
+
+
+        
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+            Network Namespace
+        </h1>
+    
+
+                
+                    <div class="article-meta">
+                        
+    <div class="article-date">
+        <i class="fas fa-calendar-alt"></i>
+        <a href="/2015/12/13/netns/">
+            <time datetime="2015-12-13T13:05:09.000Z" itemprop="datePublished">2015-12-13</time>
+        </a>
+    </div>
+
+
+                        
+    <div class="article-category">
+    	<i class="fas fa-folder"></i>
+        <a class="article-category-link" href="/categories/Docker/">Docker</a>
+    </div>
+
+                        
+    <div class="article-tag">
+        <i class="fas fa-tag"></i>
+        <a class="tag-link" href="/tags/Linux-namespace/">Linux namespace</a>
+    </div>
+
+                    </div>
+                
+            </header>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+        
+            
+            <p>周末学习了针对网络相关的Linux Namespace模块，搜罗了一些资料，搭建了小小的测试环境，查阅了一些源码实现，此处做了下小小的笔记。<br><a id="more"></a> </p>
+<h2 id="Network-Namespace"><a href="#Network-Namespace" class="headerlink" title="Network Namespace"></a>Network Namespace</h2><p>Network Namespace是Linux Kernel实现的六个Namespace之一，其实现了对内核网络模块的隔离。一个network namespace提供了一个隔离的空间，该隔离范畴包括：</p>
+<ol>
+<li>网络设备接口；</li>
+<li>IPv4，IPv6协议栈；</li>
+<li>IP路由表；</li>
+<li>防火墙规则；</li>
+<li>/proc/net and /sys/class/net目录树； </li>
+<li>socket 等 </li>
+</ol>
+<p>ip命令行工具提供了netns的操作，包括创建，删除network namespace等操作，可以以此分析下netns的实现原理。</p>
+<h2 id="简单的netns通信实例"><a href="#简单的netns通信实例" class="headerlink" title="简单的netns通信实例"></a>简单的netns通信实例</h2><p>这里主要使用ip命令行工具来搭建一个比较简单的不同namespace之间通信的拓扑图。如下：<br><img src="http://7xoxkz.com1.z0.glb.clouddn.com/ns_3.PNG" alt=""></p>
+<ol>
+<li><p>创建两个network namespace：beijing，shanghai</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">root@royluo-VirtualBox:/home/royluo<span class="comment"># ip netns add beijing</span></span><br><span class="line">root@royluo-VirtualBox:/home/royluo<span class="comment"># ip netns add shanghai</span></span><br><span class="line">root@royluo-VirtualBox:/home/royluo<span class="comment"># ip netns</span></span><br><span class="line">shanghai</span><br><span class="line">beijing</span><br><span class="line">root@royluo-VirtualBox:/home/royluo<span class="comment"># ls /var/run/netns</span></span><br><span class="line">beijing  shanghai</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>创建一个bridge：br0</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">root@royluo-ThinkPad-T430:~<span class="comment"># brctl addbr br0</span></span><br><span class="line">root@royluo-ThinkPad-T430:~<span class="comment"># brctl show</span></span><br><span class="line">bridge name     bridge id               STP enabled     interfaces</span><br><span class="line">br0             8000.000000000000       no</span><br><span class="line">root@royluo-ThinkPad-T430:/home/royluo<span class="comment"># ip link set br0 up</span></span><br></pre></td></tr></table></figure>
+</li>
+<li><p>创建两个veth interface，并分别设置对应的peer name，将两个veth加入br0</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">root@royluo-VirtualBox:/home/royluo<span class="comment"># ip link add eth0-b type veth peer name veth-b</span></span><br><span class="line">root@royluo-VirtualBox:/home/royluo<span class="comment"># ip link add eth0-s type veth peer name veth-s</span></span><br><span class="line">root@royluo-VirtualBox:/home/royluo<span class="comment"># ip link</span></span><br><span class="line">......</span><br><span class="line">3: br0: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc noqueue state UNKNOWN mode DEFAULT group default </span><br><span class="line">    link/ether fe:60:98:7f:e8:19 brd ff:ff:ff:ff:ff:ff</span><br><span class="line">4: veth-b: &lt;BROADCAST,MULTICAST&gt; mtu 1500 qdisc noop state DOWN mode DEFAULT group default qlen 1000</span><br><span class="line">    link/ether 06:72:2f:b2:09:7a brd ff:ff:ff:ff:ff:ff</span><br><span class="line">5: eth0-b: &lt;NO-CARRIER,BROADCAST,MULTICAST,UP&gt; mtu 1500 qdisc pfifo_fast state DOWN mode DEFAULT group default qlen 1000</span><br><span class="line">    link/ether 56:47:69:cf:8b:76 brd ff:ff:ff:ff:ff:ff</span><br><span class="line">6: veth<span class="_">-s</span>: &lt;BROADCAST,MULTICAST&gt; mtu 1500 qdisc noop state DOWN mode DEFAULT group default qlen 1000</span><br><span class="line">    link/ether 36:7a:e4:4b:09:26 brd ff:ff:ff:ff:ff:ff</span><br><span class="line">7: eth0<span class="_">-s</span>: &lt;NO-CARRIER,BROADCAST,MULTICAST,UP&gt; mtu 1500 qdisc pfifo_fast state DOWN mode DEFAULT group default qlen 1000</span><br><span class="line">    link/ether 5e:af:32:75:f8:e6 brd ff:ff:ff:ff:ff:ff</span><br><span class="line">root@royluo-VirtualBox:/home/royluo<span class="comment"># brctl addif br0 veth-b</span></span><br><span class="line">root@royluo-VirtualBox:/home/royluo<span class="comment"># brctl addif br0 veth-s</span></span><br><span class="line">root@royluo-VirtualBox:/home/royluo<span class="comment"># brctl show</span></span><br><span class="line">bridge name     bridge id               STP enabled     interfaces</span><br><span class="line">br0             8000.06722fb2097a       no              veth-b</span><br><span class="line">                                                        veth<span class="_">-s</span></span><br><span class="line">root@royluo-VirtualBox:/home/royluo<span class="comment"># ip link set veth-b up</span></span><br><span class="line">root@royluo-VirtualBox:/home/royluo<span class="comment"># ip link set veth-s up</span></span><br></pre></td></tr></table></figure>
+</li>
+<li><p>将veth的另一端分别加入beijing，shanghai的namespace中,在各自的ns中只能看到自己拥有的dev；</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">root@royluo-VirtualBox:/home/royluo<span class="comment"># ip link set eth0-b netns beijing</span></span><br><span class="line">root@royluo-VirtualBox:/home/royluo<span class="comment"># ip link set eth0-s netns shanghai</span></span><br><span class="line"></span><br><span class="line">root@royluo-VirtualBox:/home/royluo<span class="comment"># ip netns exec beijing ip link</span></span><br><span class="line">1: lo: &lt;LOOPBACK&gt; mtu 65536 qdisc noop state DOWN mode DEFAULT group default </span><br><span class="line">    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00</span><br><span class="line">5: eth0-b: &lt;BROADCAST,MULTICAST&gt; mtu 1500 qdisc noop state DOWN mode DEFAULT group default qlen 1000</span><br><span class="line">    link/ether 56:47:69:cf:8b:76 brd ff:ff:ff:ff:ff:ff</span><br><span class="line"></span><br><span class="line">root@royluo-VirtualBox:/home/royluo<span class="comment"># ip netns exec shanghai ip link</span></span><br><span class="line">1: lo: &lt;LOOPBACK&gt; mtu 65536 qdisc noop state DOWN mode DEFAULT group default </span><br><span class="line">    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00</span><br><span class="line">7: eth0<span class="_">-s</span>: &lt;BROADCAST,MULTICAST&gt; mtu 1500 qdisc noop state DOWN mode DEFAULT group default qlen 1000</span><br><span class="line">    link/ether 5e:af:32:75:f8:e6 brd ff:ff:ff:ff:ff:ff</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>将各自namespace中的接口up，同时设置ip地址；</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">root@royluo-VirtualBox:/home/royluo<span class="comment"># ip netns exec beijing ip link set dev lo up </span></span><br><span class="line">root@royluo-VirtualBox:/home/royluo<span class="comment"># ip netns exec beijing ip link set dev eth0-b up</span></span><br><span class="line">root@royluo-VirtualBox:/home/royluo<span class="comment"># ip netns exec beijing ip address add 10.0.0.1/24 dev eth0-b</span></span><br><span class="line"></span><br><span class="line">root@royluo-VirtualBox:/home/royluo<span class="comment"># ip netns exec shanghai ip link set dev lo up</span></span><br><span class="line">root@royluo-VirtualBox:/home/royluo<span class="comment"># ip netns exec shanghai ip link set dev eth0-s up </span></span><br><span class="line">root@royluo-VirtualBox:/home/royluo<span class="comment"># ip netns exec shanghai ip address add 10.0.0.2/24 dev eth0-s</span></span><br></pre></td></tr></table></figure>
+</li>
+<li><p>互ping对方，此时通过bridge完成通信的目标达成；</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">root@royluo-VirtualBox:/home/royluo<span class="comment"># ip netns exec beijing ping 10.0.0.1</span></span><br><span class="line">PING 10.0.0.1 (10.0.0.1) 56(84) bytes of data.</span><br><span class="line">64 bytes from 10.0.0.1: icmp_seq=1 ttl=64 time=0.050 ms</span><br><span class="line">64 bytes from 10.0.0.1: icmp_seq=2 ttl=64 time=0.110 ms</span><br><span class="line">^C</span><br><span class="line">--- 10.0.0.1 ping statistics ---</span><br><span class="line">2 packets transmitted, 2 received, 0% packet loss, time 999ms</span><br><span class="line">rtt min/avg/max/mdev = 0.050/0.080/0.110/0.030 ms</span><br><span class="line">root@royluo-VirtualBox:/home/royluo<span class="comment"># ip netns exec shanghai ping 10.0.0.2</span></span><br><span class="line">PING 10.0.0.2 (10.0.0.2) 56(84) bytes of data.</span><br><span class="line">64 bytes from 10.0.0.2: icmp_seq=1 ttl=64 time=0.052 ms</span><br><span class="line">64 bytes from 10.0.0.2: icmp_seq=2 ttl=64 time=0.054 ms</span><br><span class="line">^C</span><br><span class="line">--- 10.0.0.2 ping statistics ---</span><br><span class="line">2 packets transmitted, 2 received, 0% packet loss, time 999ms</span><br><span class="line">rtt min/avg/max/mdev = 0.052/0.053/0.054/0.001 ms</span><br></pre></td></tr></table></figure>
+</li>
+</ol>
+<h2 id="源码分析"><a href="#源码分析" class="headerlink" title="源码分析"></a>源码分析</h2><p>ip命令行工具的源码下载：<a href="https://github.com/shemminger/iproute2" target="_blank" rel="noopener">https://github.com/shemminger/iproute2</a>,其作为用户态工具主要通过netlink机制与内核进行交互。</p>
+<h3 id="ip-netns-add-xxx"><a href="#ip-netns-add-xxx" class="headerlink" title="ip netns add xxx"></a>ip netns add xxx</h3><p>此功能主要是创建一个新的network namespace；主要代码在ipnetns.c<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">static int netns_add(int argc, char **argv)</span><br><span class="line">&#123;</span><br><span class="line">	//创建/var/run/netns</span><br><span class="line">	mkdir(NETNS_RUN_DIR, S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH);</span><br><span class="line">	//创建打开/var/run/netns/xxx</span><br><span class="line">	fd = open(netns_path, O_RDONLY|O_CREAT|O_EXCL, 0);</span><br><span class="line">	//脱离父进程的netns，此时拥有了独立的netns</span><br><span class="line">	unshare(CLONE_NEWNET)  &lt;&lt;&lt;&lt;&lt;&lt;unshare() API</span><br><span class="line">	//将/proc/self/ns/net mount到/var/run/netns/xxx</span><br><span class="line">	mount(<span class="string">"/proc/self/ns/net"</span>, netns_path, <span class="string">"none"</span>, MS_BIND, NULL)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>这样ip netns add xxx命令结束后，/proc/self/ns/net对应的namespace也不会消失。<br>在每个进程所属的/proc/$pid/ns下面都可以看到每个ns对应的id，相同的ns具有相同的id。<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">root@royluo-VirtualBox:/proc/4232/ns<span class="comment"># ls -l</span></span><br><span class="line">total 0</span><br><span class="line">lrwxrwxrwx 1 root root 0 12月 13 02:12 ipc -&gt; ipc:[4026531839]</span><br><span class="line">lrwxrwxrwx 1 root root 0 12月 13 02:12 mnt -&gt; mnt:[4026531840]</span><br><span class="line">lrwxrwxrwx 1 root root 0 12月 13 02:12 net -&gt; net:[4026531956]   &lt;&lt;&lt;&lt;&lt;&lt;</span><br><span class="line">lrwxrwxrwx 1 root root 0 12月 13 02:12 pid -&gt; pid:[4026531836]</span><br><span class="line">lrwxrwxrwx 1 root root 0 12月 13 02:12 user -&gt; user:[4026531837]</span><br><span class="line">lrwxrwxrwx 1 root root 0 12月 13 02:12 uts -&gt; uts:[4026531838]</span><br><span class="line">root@royluo-VirtualBox:/proc/4232/ns<span class="comment">#</span></span><br></pre></td></tr></table></figure></p>
+<p>通过这样的机制创建了新的netns。</p>
+<h3 id="ip-netns-exec-xxx-command"><a href="#ip-netns-exec-xxx-command" class="headerlink" title="ip netns exec xxx command"></a>ip netns exec xxx command</h3><p>在指定的ns中执行command<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">static int netns_exec(int argc, char **argv)</span><br><span class="line">&#123;</span><br><span class="line">	...</span><br><span class="line">	//打开指定ns在/var/run/netns/xxx文件，该文件之前在ip netns add中创建，绑定到一个指定的ns</span><br><span class="line">	snprintf(net_path, sizeof(net_path), <span class="string">"%s/%s"</span>, NETNS_RUN_DIR, name);</span><br><span class="line">	netns = open(net_path, O_RDONLY);</span><br><span class="line">	...</span><br><span class="line">	//通过setns，进入指定的ns的namespace中</span><br><span class="line">	setns(netns, CLONE_NEWNET)  &lt;&lt;&lt;&lt;&lt;setns() API</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">内核代码实现：</span><br><span class="line">SYSCALL_DEFINE2(setns, int, fd, int, nstype)</span><br><span class="line">&#123;</span><br><span class="line">	...</span><br><span class="line">	//得到fd对应的/proc文件系统中的信息</span><br><span class="line">	file = proc_ns_fget(fd);</span><br><span class="line">	......</span><br><span class="line">	ei = get_proc_ns(file_inode(file));</span><br><span class="line">	//创建一个新的ns</span><br><span class="line">	new_nsproxy = create_new_namespaces(0, tsk, current_user_ns(), tsk-&gt;fs);</span><br><span class="line">	...</span><br><span class="line">	//在新的ns中挂载指定类型的ns</span><br><span class="line">	ops-&gt;install(new_nsproxy, ei-&gt;ns);</span><br><span class="line">	....</span><br><span class="line">	//切换到新的namespace中</span><br><span class="line">	switch_task_namespaces(tsk, new_nsproxy);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<h3 id="ip-link-add-xxx-type-veth-peer-name-yyy"><a href="#ip-link-add-xxx-type-veth-peer-name-yyy" class="headerlink" title="ip link add xxx type veth peer name yyy"></a>ip link add xxx type veth peer name yyy</h3><p>创建veth接口，veth是内核中比较特殊的接口，其以pair形式存在，即该设备的接口成对出现，如图中的Eeth0-B<------->VETH-B, Eeth0-S<------->VETH-S.其实现代码在linux源码中以驱动类型出现：driver/net/veth.c<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">static int veth_newlink(struct net *src_net, struct net_device *dev,</span><br><span class="line">			 struct nlattr *tb[], struct nlattr *data[])</span><br><span class="line">&#123;</span><br><span class="line">	...</span><br><span class="line">	priv = netdev_priv(dev);       &lt;&lt;&lt;&lt;&lt;&lt;&lt;</span><br><span class="line">	rcu_assign_pointer(priv-&gt;peer, peer);  </span><br><span class="line">                                     </span><br><span class="line">	priv = netdev_priv(peer);      &lt;&lt;&lt;&lt;&lt;&lt;&lt;成对的创建和注册</span><br><span class="line">	rcu_assign_pointer(priv-&gt;peer, dev);   </span><br><span class="line">	...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></-------></-------></p>
+<p>接口上的数据流向的特殊性主要体现在veth_xmit()<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">static netdev_tx_t veth_xmit(struct sk_buff *skb, struct net_device *dev)</span><br><span class="line">&#123;</span><br><span class="line">	struct veth_priv *priv = netdev_priv(dev);</span><br><span class="line">	struct net_device *rcv;</span><br><span class="line">	int length = skb-&gt;len;</span><br><span class="line"></span><br><span class="line">	rcu_read_lock();</span><br><span class="line">	rcv = rcu_dereference(priv-&gt;peer);  &lt;&lt;&lt;&lt;&lt;取出peer dev</span><br><span class="line"></span><br><span class="line">	dev_forward_skb(rcv, skb)  &lt;&lt;&lt;&lt;&lt;peer dev直接收取dev发送的数据</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>veth就像一个管道，两端接口可以分配给不同的namespace，实现两个不同ns之间的通信</p>
+<h3 id="ip-link-set-xxx-netns-yyy"><a href="#ip-link-set-xxx-netns-yyy" class="headerlink" title="ip link set xxx netns yyy"></a>ip link set xxx netns yyy</h3><p>将接口xxx配置给netns yyy，如何取得yyy的namespace呢？主要通过打开/var/run/netns/yyy文件，得到fd后，通过内核对/proc文件操作得到ns id，最后将其设置给net_dev，使指定的netdev属于指定的ns。<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">int get_netns_fd(const char *name)</span><br><span class="line">&#123;</span><br><span class="line">	char pathbuf[MAXPATHLEN];</span><br><span class="line">	const char *path, *ptr;</span><br><span class="line"></span><br><span class="line">	path = name;</span><br><span class="line">	ptr = strchr(name, <span class="string">'/'</span>);</span><br><span class="line">	<span class="keyword">if</span> (!ptr) &#123;</span><br><span class="line">		snprintf(pathbuf, sizeof(pathbuf), <span class="string">"%s/%s"</span>,</span><br><span class="line">			NETNS_RUN_DIR, name );</span><br><span class="line">		path = pathbuf;</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="built_in">return</span> open(path, O_RDONLY);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<h3 id="network-namespace内核的支持与实现"><a href="#network-namespace内核的支持与实现" class="headerlink" title="network namespace内核的支持与实现"></a>network namespace内核的支持与实现</h3><p>未完待续……</p>
+
+        
+        </div>
+        <footer class="article-footer">
+            <div class="share-container">
+
+
+
+</div>
+
+    <a data-url="http://royhunter.github.io/2015/12/13/netns/" data-id="ck2oe6fof002gxkkvudycyuvz" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+<script>
+    (function ($) {
+        // Prevent duplicate binding
+        if (typeof(__SHARE_BUTTON_BINDED__) === 'undefined' || !__SHARE_BUTTON_BINDED__) {
+            __SHARE_BUTTON_BINDED__ = true;
+        } else {
+            return;
+        }
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url'),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="fab fa-twitter article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="fab fa-facebook article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="fab fa-pinterest article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                            '<a href="https://plus.google.com/share?url=' + encodedUrl + '" class="fab fa-google article-share-google" target="_blank" title="Google+"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+            
+    
+
+        </footer>
+    </div>
+    
+        
+<nav id="article-nav">
+    
+        <a href="/2016/01/02/runc/" id="article-nav-newer" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Newer</strong>
+            <div class="article-nav-title">
+                
+                    runC
+                
+            </div>
+        </a>
+    
+    
+        <a href="/2015/12/07/container-namespace/" id="article-nav-older" class="article-nav-link-wrap">
+            <strong class="article-nav-caption">Older</strong>
+            <div class="article-nav-title">Container的内核技术基础：Namespace</div>
+        </a>
+    
+</nav>
+
+
+    
+</article>
+
+
+    
+    
+
+</section>
+            
+                
+<aside id="sidebar">
+   
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">recent</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2020/07/12/index/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"></p>
+                            <p class="item-title"><a href="/2020/07/12/index/" class="title">Blog索引</a></p>
+                            <p class="item-date"><time datetime="2020-07-12T13:33:28.000Z" itemprop="datePublished">2020-07-12</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/07/17/ovs02-vxlan/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/07/17/ovs02-vxlan/" class="title">OVS02-VXLAN内核相关实现</a></p>
+                            <p class="item-date"><time datetime="2018-07-17T12:15:34.000Z" itemprop="datePublished">2018-07-17</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2018/01/10/perf-tunning/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2018/01/10/perf-tunning/" class="title">datapath性能优化总结</a></p>
+                            <p class="item-date"><time datetime="2018-01-10T13:26:32.000Z" itemprop="datePublished">2018-01-10</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2017/04/18/ovs01/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Virtualization/">Virtualization</a></p>
+                            <p class="item-title"><a href="/2017/04/18/ovs01/" class="title">OVS01-OVS基础-安装、配置、Simple Case</a></p>
+                            <p class="item-date"><time datetime="2017-04-18T13:26:32.000Z" itemprop="datePublished">2017-04-18</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/2016/08/28/trampolines-for-nested-functions/" class="thumbnail">
+    
+    
+        <span class="thumbnail-image thumbnail-none"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Programme/">Programme</a></p>
+                            <p class="item-title"><a href="/2016/08/28/trampolines-for-nested-functions/" class="title">Trampolines for Nested Functions in GCC</a></p>
+                            <p class="item-date"><time datetime="2016-08-28T13:26:32.000Z" itemprop="datePublished">2016-08-28</time></p>
+                        </div>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">categories</h3>
+        <div class="widget">
+            <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Algorithm/">Algorithm</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Container/">Container</a><span class="category-list-count">2</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Docker/">Docker</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Hyper-V/">Hyper-V</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/KVM/">KVM</a><span class="category-list-count">22</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Misc/">Misc</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/PROGRAMME/">PROGRAMME</a><span class="category-list-count">1</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Programme/">Programme</a><span class="category-list-count">3</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/Virtualization/">Virtualization</a><span class="category-list-count">4</span></li><li class="category-list-item"><a class="category-list-link" href="/categories/go/">go</a><span class="category-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">archives</h3>
+        <div class="widget">
+            <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">July 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">July 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">January 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">April 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">August 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/06/">June 2016</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/05/">May 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/03/">March 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/02/">February 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/01/">January 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/12/">December 2015</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2015/11/">November 2015</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/08/">August 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/07/">July 2014</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/06/">June 2014</a><span class="archive-list-count">5</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tags</h3>
+        <div class="widget">
+            <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Container/">Container</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Distribute/">Distribute</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/EPT/">EPT</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux-namespace/">Linux namespace</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Network/">Network</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/PROGRAMME/">PROGRAMME</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Programme-Language/">Programme Language</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/QEMU/">QEMU</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Tools/">Tools</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization/">Virtualization</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Virtualization-KVM-QEMU/">Virtualization KVM QEMU</a><span class="tag-list-count">9</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/libvirt/">libvirt</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vhost/">vhost</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/virtio/">virtio</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vps-proxy/">vps_proxy</a><span class="tag-list-count">1</span></li></ul>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap">
+        <h3 class="widget-title">tag cloud</h3>
+        <div class="widget tagcloud">
+            <a href="/tags/Container/" style="font-size: 12.5px;">Container</a> <a href="/tags/Distribute/" style="font-size: 12.5px;">Distribute</a> <a href="/tags/EPT/" style="font-size: 12.5px;">EPT</a> <a href="/tags/Linux-namespace/" style="font-size: 12.5px;">Linux namespace</a> <a href="/tags/Network/" style="font-size: 15px;">Network</a> <a href="/tags/PROGRAMME/" style="font-size: 10px;">PROGRAMME</a> <a href="/tags/Programme-Language/" style="font-size: 10px;">Programme Language</a> <a href="/tags/QEMU/" style="font-size: 12.5px;">QEMU</a> <a href="/tags/Tools/" style="font-size: 12.5px;">Tools</a> <a href="/tags/Virtualization/" style="font-size: 17.5px;">Virtualization</a> <a href="/tags/Virtualization-KVM-QEMU/" style="font-size: 20px;">Virtualization KVM QEMU</a> <a href="/tags/libvirt/" style="font-size: 10px;">libvirt</a> <a href="/tags/vhost/" style="font-size: 10px;">vhost</a> <a href="/tags/virtio/" style="font-size: 17.5px;">virtio</a> <a href="/tags/vps-proxy/" style="font-size: 10px;">vps_proxy</a>
+        </div>
+    </div>
+
+    
+        
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">links</h3>
+        <div class="widget">
+            <ul>
+                
+                    <li>
+                        <a href="http://hexo.io">Hexo</a>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+
+    
+    <div id="toTop" class="fas fa-angle-up"></div>
+</aside>
+
+            
+        </div>
+        <footer id="footer">
+    <div class="outer">
+        <div id="footer-info" class="inner">
+            &copy; 2019 John Doe<br>
+            Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>. Theme by <a href="http://github.com/ppoffice">PPOffice</a>
+        </div>
+    </div>
+</footer>
+        
+
+
+    
+        <script src="/libs/lightgallery/js/lightgallery.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-thumbnail.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-pager.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-autoplay.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-fullscreen.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-zoom.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-hash.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-share.min.js"></script>
+        <script src="/libs/lightgallery/js/lg-video.min.js"></script>
+    
+    
+        <script src="/libs/justified-gallery/jquery.justifiedGallery.min.js"></script>
+    
+    
+
+
+
+<!-- Custom Scripts -->
+<script src="/js/main.js"></script>
+
+    </div>
+</body>
+</html>
