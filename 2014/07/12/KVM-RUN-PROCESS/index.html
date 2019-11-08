@@ -13,12 +13,12 @@
 <meta property="og:site_name" content="RoyLuo&#39;s Notes">
 <meta property="og:description" content="在前文中，介绍了在KVM环境下使用Qemu成功创建并运行了虚拟机，而这一切的背后是什么样的运作机制呢？本文主要介绍在整个创建和运行过程中Qemu与KVM里两者的核心运行流程。">
 <meta property="og:locale" content="en">
-<meta property="og:image" content="http://7ktq2s.com1.z0.glb.clouddn.com/2.png">
-<meta property="og:updated_time" content="2015-08-04T14:08:06.000Z">
+<meta property="og:image" content="http://royhunter.github.io/images/kvm-run-process/2.png">
+<meta property="og:updated_time" content="2019-11-08T03:09:20.940Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="KVM Run Process之Qemu核心流程">
 <meta name="twitter:description" content="在前文中，介绍了在KVM环境下使用Qemu成功创建并运行了虚拟机，而这一切的背后是什么样的运作机制呢？本文主要介绍在整个创建和运行过程中Qemu与KVM里两者的核心运行流程。">
-<meta name="twitter:image" content="http://7ktq2s.com1.z0.glb.clouddn.com/2.png">
+<meta name="twitter:image" content="http://royhunter.github.io/images/kvm-run-process/2.png">
     
 
     
@@ -311,7 +311,7 @@ QEMU_OPTION_smp                    smp相关
 <li>通过<em>KVM_RUN</em>调用KVM提供的API发起KVM的启动，从这里进入到了内核空间运行，等待运行返回；</li>
 <li>重复循环进入run阶段。</li>
 </ol>
-<p>附图：<br><img src="http://7ktq2s.com1.z0.glb.clouddn.com/2.png" alt=""></p>
+<p>附图：<br><img src="/images/kvm-run-process/2.png" alt=""></p>
 <p>下一文，将介绍VM在KVM中的核心执行流程。</p>
 
         
@@ -323,7 +323,7 @@ QEMU_OPTION_smp                    smp相关
 
 </div>
 
-    <a data-url="http://royhunter.github.io/2014/07/12/KVM-RUN-PROCESS/" data-id="ck2pi7jpo0008dlkvy3yro8w1" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+    <a data-url="http://royhunter.github.io/2014/07/12/KVM-RUN-PROCESS/" data-id="ck2pka5yn0000p3kv7o4l5kza" class="article-share-link"><i class="fas fa-share"></i>Share</a>
 <script>
     (function ($) {
         // Prevent duplicate binding

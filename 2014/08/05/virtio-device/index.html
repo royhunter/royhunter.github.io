@@ -13,12 +13,12 @@
 <meta property="og:site_name" content="RoyLuo&#39;s Notes">
 <meta property="og:description" content="Linux目前支持至少了8种虚拟化系统：    Xen KVM VMware’s VMI IBM’s System p IBM’s System z User Mode Linux lguest  IBM’s legacy iSeries  而新的系统也在不断的涌现，各个系统在网络设备、块设备、console及其它设备驱动在新特性支持和性能优化方面存在着瓶颈。 为解决这些问题，Rusty Russ">
 <meta property="og:locale" content="en">
-<meta property="og:image" content="http://7lrywd.com1.z0.glb.clouddn.com/1.png">
-<meta property="og:updated_time" content="2016-06-25T04:06:56.000Z">
+<meta property="og:image" content="http://royhunter.github.io/images/virtio-dev/1.png">
+<meta property="og:updated_time" content="2019-11-08T03:09:19.409Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Virtio----Virtio Netdev Introduce">
 <meta name="twitter:description" content="Linux目前支持至少了8种虚拟化系统：    Xen KVM VMware’s VMI IBM’s System p IBM’s System z User Mode Linux lguest  IBM’s legacy iSeries  而新的系统也在不断的涌现，各个系统在网络设备、块设备、console及其它设备驱动在新特性支持和性能优化方面存在着瓶颈。 为解决这些问题，Rusty Russ">
-<meta name="twitter:image" content="http://7lrywd.com1.z0.glb.clouddn.com/1.png">
+<meta name="twitter:image" content="http://royhunter.github.io/images/virtio-dev/1.png">
     
 
     
@@ -285,7 +285,7 @@
 </blockquote>
 <p>理解: 正如Linux提供了各种hypervisor解决方案，这些解决方案都有自己的特点和优点。这些解决方案包括 Kernel-based Virtual Machine (KVM)、lguest和User-mode Linux等。在这些解决方案中需要各自实现自身平台下的设备虚拟化。而virtio为这些设备模拟提供了一个通用的前端，标准化了接口和增加了代码的跨平台重用。virtio提供了一套有效，易维护、易开发、易扩展的中间层 API，它为 hypervisor 和一组通用的 I/O虚拟化驱动程序提供高效的抽象。减少了各类平台下大量驱动开发的负担。</p>
 <h2 id="Virtio的基本架构"><a href="#Virtio的基本架构" class="headerlink" title="Virtio的基本架构"></a>Virtio的基本架构</h2><p>QEMU/KVM中，Virtio的基本架构如下图：</p>
-<p><img src="http://7lrywd.com1.z0.glb.clouddn.com/1.png" alt=""></p>
+<p><img src="/images/virtio-dev/1.png" alt=""></p>
 <p>其中前端驱动（front-end，如virtio-blk、virtio-net等）是在Guest中存在的驱动程序模块，而后端处理程序(back-end)是在QEMU中实现的。在这前后端驱动之间，还定义了两层来支持Guest与QEMU之间的通信。其中，“virtio”这一层是虚拟队列接口，它在概念上将前端驱动程序附加到后端处理程序。一个前端驱动程序可以使用0个或多个队列，具体数量取决于需求。例如，virtio-net网络驱动程序使用两个虚拟队列(一个用于接收，另一个用于发送)，而virtio-blk块驱动程序仅使用一个虚拟队列。虚拟队列实际上被实现为跨越Guest OS和hypervisor的联系，但它可以通过任意方式实现，前提是Guest OS和virtio后端程序都遵循一定的标准，以相互匹配的方式实现它。</p>
 <p>virtio-queue实现了环形缓冲区(ring buffer)，用于保存前端驱动和后端处理程序执行的信息，并且它可以批量的方式保存前端驱动的多次I/O请求，并且交由后端去批量处理，减少虚拟运行环境的模式切换，从而提高Guest与hypervisor信息交换的效率。</p>
 <h2 id="Virtio设备的创建"><a href="#Virtio设备的创建" class="headerlink" title="Virtio设备的创建"></a>Virtio设备的创建</h2><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">qemu-system-x86_64 -net nic,model=?</span><br><span class="line">qemu: Supported NIC models: ne2k_pci,i82551,i82557b,i82559er,rtl8139,e1000,pcnet,virtio   &lt;-----</span><br></pre></td></tr></table></figure>
@@ -383,7 +383,7 @@ static int virtnet_probe(struct virtio_device *vdev)
 
 </div>
 
-    <a data-url="http://royhunter.github.io/2014/08/05/virtio-device/" data-id="ck2pi7jr0003wdlkvfdmn20yb" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+    <a data-url="http://royhunter.github.io/2014/08/05/virtio-device/" data-id="ck2pka60g003tp3kv3fzg24zy" class="article-share-link"><i class="fas fa-share"></i>Share</a>
 <script>
     (function ($) {
         // Prevent duplicate binding
