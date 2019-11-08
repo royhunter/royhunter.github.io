@@ -13,12 +13,12 @@
 <meta property="og:site_name" content="RoyLuo&#39;s Notes">
 <meta property="og:description" content="容器的最重要的特性之一是资源的隔离性，Linux内核为Container的实现提供了比较重要的技术基础之一： Namespace技术。Namespace这个词我们并不陌生，最常见的就是编程语言中的namespace概念，主要是命名空间或者package管理空间等。我的理解就是提供了一个新的环境或世界，该环境或世界提供了与其它环境或世界隔离，并拥有自我内部独立的运行规则。(漫威的漫画中经常有平行世界">
 <meta property="og:locale" content="en">
-<meta property="og:image" content="http://7xoxkz.com1.z0.glb.clouddn.com/ns_2.png">
-<meta property="og:updated_time" content="2016-06-25T04:11:08.000Z">
+<meta property="og:image" content="http://royhunter.github.io/images/docker/ns_2.png">
+<meta property="og:updated_time" content="2019-11-08T02:16:41.326Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Container的内核技术基础：Namespace">
 <meta name="twitter:description" content="容器的最重要的特性之一是资源的隔离性，Linux内核为Container的实现提供了比较重要的技术基础之一： Namespace技术。Namespace这个词我们并不陌生，最常见的就是编程语言中的namespace概念，主要是命名空间或者package管理空间等。我的理解就是提供了一个新的环境或世界，该环境或世界提供了与其它环境或世界隔离，并拥有自我内部独立的运行规则。(漫威的漫画中经常有平行世界">
-<meta name="twitter:image" content="http://7xoxkz.com1.z0.glb.clouddn.com/ns_2.png">
+<meta name="twitter:image" content="http://royhunter.github.io/images/docker/ns_2.png">
     
 
     
@@ -228,7 +228,7 @@
         
             
 	
-		<img src="http://7xoxkz.com1.z0.glb.clouddn.com/ns_2.png" class="article-banner" />
+		<img src="/images/docker/ns_2.png" class="article-banner" />
 	
 
 
@@ -357,7 +357,7 @@ root@royluo:~/work/container#
 root     26013  0.0  0.4  21112  2012 pts/3    S+   07:25   0:00 /bin/bash
 root     26110  0.0  0.1  11740   932 pts/0    S+   07:26   0:00 grep --color=auto 26013
 root@royluo:~# 
-</code></pre><p>显然CLONE_NEWPID在作怪。由于新建了PID的namespace，子进程就会在一个新的PID namespace里另起炉灶，成为了PID为1的进程，而父进程ID为0，表示不存在。<br>在Unix系统中，PID为1的进程很特殊，一般都是init进程，系统中其他进程都是由init继承而来，扮演终极父进程的角色。失去了父进程的子进程就都会以init作为它们的父进程。所以在新的namespace里由于PID的隔离性，导致了子进程从PID为1重新开始。其无法看到父进程的所有信息，但父进程却可以看到子进程。<br>下图将父子进程和其各自的namespace的关系陈述的很清楚，父进程在一个namespace，子进程在一个新的namespace，子进程所属父进程的namespace，而在子进程的namespace中是独自拥有的namespace。<br><img src="http://7xoxkz.com1.z0.glb.clouddn.com/ns_1.PNG" alt=""></p>
+</code></pre><p>显然CLONE_NEWPID在作怪。由于新建了PID的namespace，子进程就会在一个新的PID namespace里另起炉灶，成为了PID为1的进程，而父进程ID为0，表示不存在。<br>在Unix系统中，PID为1的进程很特殊，一般都是init进程，系统中其他进程都是由init继承而来，扮演终极父进程的角色。失去了父进程的子进程就都会以init作为它们的父进程。所以在新的namespace里由于PID的隔离性，导致了子进程从PID为1重新开始。其无法看到父进程的所有信息，但父进程却可以看到子进程。<br>下图将父子进程和其各自的namespace的关系陈述的很清楚，父进程在一个namespace，子进程在一个新的namespace，子进程所属父进程的namespace，而在子进程的namespace中是独自拥有的namespace。<br><img src="/images/docker/ns_1.PNG" alt=""></p>
 <h2 id="内核实现"><a href="#内核实现" class="headerlink" title="内核实现"></a>内核实现</h2><hr>
 <p>在内核中每个进程都有一个struct task_struct 结构来表示，其中struct nsproxy 代表关联的namespace<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">task_struct</span> &#123;</span></span><br><span class="line">	...</span><br><span class="line">	<span class="comment">/* open file information */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">files_struct</span> *<span class="title">files</span>;</span></span><br><span class="line">	<span class="comment">/* namespaces */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">nsproxy</span> *<span class="title">nsproxy</span>;</span>   &lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;<span class="keyword">namespace</span>信息结构</span><br><span class="line">	<span class="comment">/* signal handlers */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">signal_struct</span> *<span class="title">signal</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">sighand_struct</span> *<span class="title">sighand</span>;</span></span><br><span class="line">	...</span><br><span class="line">&#125;</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">nsproxy</span> &#123;</span></span><br><span class="line">	<span class="keyword">atomic_t</span> count;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">uts_namespace</span> *<span class="title">uts_ns</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">ipc_namespace</span> *<span class="title">ipc_ns</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">mnt_namespace</span> *<span class="title">mnt_ns</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">pid_namespace</span> *<span class="title">pid_ns_for_children</span>;</span>  &lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;PID <span class="keyword">namespace</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">net</span> 	     *<span class="title">net_ns</span>;</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure></p>
 <p>Clone是一个系统调用，在Linux内核中最终会调用do_fork():</p>
@@ -440,7 +440,7 @@ static struct nsproxy *create_new_namespaces(unsigned long flags,
 
 </div>
 
-    <a data-url="http://royhunter.github.io/2015/12/07/container-namespace/" data-id="ck2okz6jn000roukvll33s07b" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+    <a data-url="http://royhunter.github.io/2015/12/07/container-namespace/" data-id="ck2pi7jpw000kdlkvs1wwzpam" class="article-share-link"><i class="fas fa-share"></i>Share</a>
 <script>
     (function ($) {
         // Prevent duplicate binding

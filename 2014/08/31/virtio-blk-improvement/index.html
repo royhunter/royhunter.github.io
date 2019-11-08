@@ -13,14 +13,14 @@
 <meta property="og:site_name" content="RoyLuo&#39;s Notes">
 <meta property="og:description" content="在前面”virtio-blk浅析”一文中我们看到了virtio-blk设备的整体架构，其核心和virtio-net设备一样通过将针对磁盘操作的request命令放入virtqueue的vring中进行传输，由于要通过用户态程序的Qemu周转一次，再到host kernel层，性能有一定的损耗。为提升virtio-blk的性能，出现了两种方案。  Bio-based virtio-blk vhost">
 <meta property="og:locale" content="en">
-<meta property="og:image" content="http://7narr6.com1.z0.glb.clouddn.com/4.PNG">
-<meta property="og:image" content="http://7narr6.com1.z0.glb.clouddn.com/5.PNG">
-<meta property="og:image" content="http://7narr6.com1.z0.glb.clouddn.com/6.PNG">
-<meta property="og:updated_time" content="2015-12-05T07:14:40.000Z">
+<meta property="og:image" content="http://royhunter.github.io/images/virtio-blk/4.PNG">
+<meta property="og:image" content="http://royhunter.github.io/images/virtio-blk/5.PNG">
+<meta property="og:image" content="http://royhunter.github.io/images/virtio-blk/6.PNG">
+<meta property="og:updated_time" content="2019-11-08T02:47:46.827Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Virtio-Blk性能加速方案">
 <meta name="twitter:description" content="在前面”virtio-blk浅析”一文中我们看到了virtio-blk设备的整体架构，其核心和virtio-net设备一样通过将针对磁盘操作的request命令放入virtqueue的vring中进行传输，由于要通过用户态程序的Qemu周转一次，再到host kernel层，性能有一定的损耗。为提升virtio-blk的性能，出现了两种方案。  Bio-based virtio-blk vhost">
-<meta name="twitter:image" content="http://7narr6.com1.z0.glb.clouddn.com/4.PNG">
+<meta name="twitter:image" content="http://royhunter.github.io/images/virtio-blk/4.PNG">
     
 
     
@@ -275,12 +275,12 @@
 </ol>
 <p>下面我们来看下这两种加速方案。</p>
 <a id="more"></a>
-<p><img src="http://7narr6.com1.z0.glb.clouddn.com/4.PNG" alt=""></p>
+<p><img src="/images/virtio-blk/4.PNG" alt=""></p>
 <h2 id="virtio-blk-acceleration"><a href="#virtio-blk-acceleration" class="headerlink" title="virtio-blk acceleration"></a>virtio-blk acceleration</h2><p>在Linux3.15主线版本上还没有出现virtio-blk加速方案的代码。相关的代码在一个<a href="mailto:git@github.com" target="_blank" rel="noopener">git@github.com</a>:asias/linux.git blk.vhost-blk的分支上，由Red Hat的Asias He实现并托管在Github，大家可以通过这个命令下载：</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">git <span class="built_in">clone</span> git@github.com:asias/linux.git</span><br><span class="line">git@github.com:asias/qemu.git blk.vhost-blk</span><br></pre></td></tr></table></figure>
 <p>一个是集成了加速方案的Linux kernel代码，一个是支持加速方案的Qemu代码。</p>
 <h3 id="Bio-based-virtio-blk"><a href="#Bio-based-virtio-blk" class="headerlink" title="Bio-based virtio-blk"></a>Bio-based virtio-blk</h3><p>代码位于： /drivers/block/virtio-blk.c<br>从如下层次图中可以看出，Bio-based加速方案通过在通用块设备层注册了make_request_fn()函数，具体实现为virtblk_make_request()，其将bio组成vbr结构，跳过了IO Scheduler层将命令写入了virtqueue的vring中的，进行kick。</p>
-<p><img src="http://7narr6.com1.z0.glb.clouddn.com/5.PNG" alt=""></p>
+<p><img src="/images/virtio-blk/5.PNG" alt=""></p>
 <p>代码调用流程：</p>
 <pre><code>virtblk_make_request()
     ---&gt;vbr = virtblk_alloc_req(vblk, GFP_NOIO);
@@ -291,7 +291,7 @@
             ---&gt;virtqueue_kick()
 </code></pre><p>而使用Bio-based virtio-blk机制需要通过命令modprobe virtio-blk use_bio = 1.</p>
 <p>###　Vhost-blk<br>类似于vhost-net，vhost-blk提供了virtio-blk在host kernel层的数据面加速。<br>代码位于： drivers/vhost/</p>
-<p><img src="http://7narr6.com1.z0.glb.clouddn.com/6.PNG" alt=""></p>
+<p><img src="/images/virtio-blk/6.PNG" alt=""></p>
 <p>和virtio-net一样，vhost通过创建“vhost-pid”的内核线程来实现vring中数据的处理及Gust和Host的双向事件通知。</p>
 <h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ol>
 <li>“2012-forum-virtio-blk-performance-improvement.pdf” — Asias He</li>
@@ -306,7 +306,7 @@
 
 </div>
 
-    <a data-url="http://royhunter.github.io/2014/08/31/virtio-blk-improvement/" data-id="ck2okz6kq003moukv9txuuvdp" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+    <a data-url="http://royhunter.github.io/2014/08/31/virtio-blk-improvement/" data-id="ck2pi7jqw003mdlkva0wy1i8m" class="article-share-link"><i class="fas fa-share"></i>Share</a>
 <script>
     (function ($) {
         // Prevent duplicate binding

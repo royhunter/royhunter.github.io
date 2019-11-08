@@ -13,14 +13,14 @@
 <meta property="og:site_name" content="RoyLuo&#39;s Notes">
 <meta property="og:description" content="KVM上设备I/O虚拟化的性能问题长期存在，此时由Rusty Russell开发的virtio引起了开发者们的注意并逐渐被KVM等虚拟化平台接纳并作为了其I/O虚拟化最主要的一个通用框架。 Virtio使用virtqueue来实现其I/O机制，每个virtqueue就是一个承载大量数据的queue。vring是virtqueue的具体实现方式。">
 <meta property="og:locale" content="en">
-<meta property="og:image" content="http://7lrywd.com1.z0.glb.clouddn.com/2.PNG">
-<meta property="og:image" content="http://7lrywd.com1.z0.glb.clouddn.com/3.png">
-<meta property="og:image" content="http://7lrywd.com1.z0.glb.clouddn.com/4.PNG">
-<meta property="og:updated_time" content="2016-06-25T04:03:12.000Z">
+<meta property="og:image" content="http://royhunter.github.io/images/virtio-dev/2.PNG">
+<meta property="og:image" content="http://royhunter.github.io/images/virtio-dev/3.png">
+<meta property="og:image" content="http://royhunter.github.io/images/virtio-dev/4.PNG">
+<meta property="og:updated_time" content="2019-11-08T02:58:57.591Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Virtio----Vring Introduce">
 <meta name="twitter:description" content="KVM上设备I/O虚拟化的性能问题长期存在，此时由Rusty Russell开发的virtio引起了开发者们的注意并逐渐被KVM等虚拟化平台接纳并作为了其I/O虚拟化最主要的一个通用框架。 Virtio使用virtqueue来实现其I/O机制，每个virtqueue就是一个承载大量数据的queue。vring是virtqueue的具体实现方式。">
-<meta name="twitter:image" content="http://7lrywd.com1.z0.glb.clouddn.com/2.PNG">
+<meta name="twitter:image" content="http://royhunter.github.io/images/virtio-dev/2.PNG">
     
 
     
@@ -273,7 +273,7 @@
 <a id="more"></a>
 <h2 id="Virtqueue：传输层的抽象"><a href="#Virtqueue：传输层的抽象" class="headerlink" title="Virtqueue：传输层的抽象"></a>Virtqueue：传输层的抽象</h2><p>每个设备拥有多个virtqueue用于大块数据的传输。virtqueue是一个简单的队列，Guest把buffers插入其中，每个buffer 都是一个分散-聚集数组。驱动调用find_vqs()来创建一个与queue关联的结构体。virtqueue的数目根据设备的不同而不同，比如block设备有一个virtqueue,network设备有2个virtqueue,一个用于发送数据包，一个用于接收数据包。</p>
 <p>在virtio设备创建过程中，形成的数据结构如图所示：</p>
-<p><img src="http://7lrywd.com1.z0.glb.clouddn.com/2.PNG" alt=""></p>
+<p><img src="/images/virtio-dev/2.PNG" alt=""></p>
 <p>从图中可以看出，virtio-netdev关联了两个virtqueue，包括一个send queue和一个receive queue，而具体的queue的实现由vring来承载。</p>
 <p>针对 virtqueue 的操作包括：</p>
 <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">virtqueue_add_buf</span><span class="params">( struct virtqueue *_vq, struct scatterlist sg[], <span class="keyword">unsigned</span> <span class="keyword">int</span> out, <span class="keyword">unsigned</span> <span class="keyword">int</span> in, <span class="keyword">void</span> *data, <span class="keyword">gfp_t</span> gfp)</span></span></span><br></pre></td></tr></table></figure>
@@ -327,7 +327,7 @@ err_rq:
     err_sq:
      return -ENOMEM;
 }
-</code></pre><p>scatterlist即是一种数组形式的数据结构，每一项成员指向一个page的地址，偏移量，长度等。<br><img src="http://7lrywd.com1.z0.glb.clouddn.com/3.png" alt=""></p>
+</code></pre><p>scatterlist即是一种数组形式的数据结构，每一项成员指向一个page的地址，偏移量，长度等。<br><img src="/images/virtio-dev/3.png" alt=""></p>
 <p>通过find vqs来创建vring:</p>
 <pre><code>static int virtnet_find_vqs(struct virtnet_info *vi)  
 {
@@ -420,7 +420,7 @@ static struct virtqueue *setup_vq(struct virtio_device *vdev, unsigned index,
 <li>使用过的ring(used ring)用于表示Host端表示那些描述符已经使用。</li>
 </ol>
 <p>Ring的数目必须是2的次幂。结构如下图所示：</p>
-<p><img src="http://7lrywd.com1.z0.glb.clouddn.com/4.PNG" alt=""></p>
+<p><img src="/images/virtio-dev/4.PNG" alt=""></p>
 <p>vring descriptor 用于指向 guest 使用的 buffer。<br>addr：guest 物理地址<br>len：buffer 的长度<br>flags：flags 的值含义包括：</p>
 <ul>
 <li>VRING_DESC_F_NEXT：用于表明当前 buffer 的下一个域是否有效，也间接表明当前 buffer 是否是 buffers list 的最后一个。</li>
@@ -440,7 +440,7 @@ static struct virtqueue *setup_vq(struct virtio_device *vdev, unsigned index,
 
 </div>
 
-    <a data-url="http://royhunter.github.io/2014/08/08/virtio-virtqueue/" data-id="ck2okz6ky0043oukv8gz339h2" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+    <a data-url="http://royhunter.github.io/2014/08/08/virtio-virtqueue/" data-id="ck2pi7jr20042dlkvgr0mu608" class="article-share-link"><i class="fas fa-share"></i>Share</a>
 <script>
     (function ($) {
         // Prevent duplicate binding

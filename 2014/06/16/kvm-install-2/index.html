@@ -13,23 +13,23 @@
 <meta property="og:site_name" content="RoyLuo&#39;s Notes">
 <meta property="og:description" content="《kvm安装与启动过程说明》进行了通用桌面系统的虚拟机安装。在本文中将介绍自行编译linux Kernel内核源码，无桌面OS虚拟机安装和启动。为后续内核调试打下基础。">
 <meta property="og:locale" content="en">
-<meta property="og:image" content="http://7j1zng.com1.z0.glb.clouddn.com/1.png">
-<meta property="og:image" content="http://7j1zng.com1.z0.glb.clouddn.com/2.png">
-<meta property="og:image" content="http://7j1zng.com1.z0.glb.clouddn.com/3.png">
-<meta property="og:image" content="http://7j1zng.com1.z0.glb.clouddn.com/4.png">
-<meta property="og:image" content="http://7j1zng.com1.z0.glb.clouddn.com/5.png">
-<meta property="og:image" content="http://7j1zng.com1.z0.glb.clouddn.com/6.png">
-<meta property="og:image" content="http://7j1zng.com1.z0.glb.clouddn.com/18.png">
-<meta property="og:image" content="http://7j1zng.com1.z0.glb.clouddn.com/17.png">
-<meta property="og:image" content="http://7j1zng.com1.z0.glb.clouddn.com/11.png">
-<meta property="og:image" content="http://7j1zng.com1.z0.glb.clouddn.com/12.png">
-<meta property="og:image" content="http://7j1zng.com1.z0.glb.clouddn.com/13.png">
-<meta property="og:image" content="http://7j1zng.com1.z0.glb.clouddn.com/14.png">
-<meta property="og:updated_time" content="2016-06-25T04:05:56.000Z">
+<meta property="og:image" content="http://royhunter.github.io/images/kvm-install-2/1.png">
+<meta property="og:image" content="http://royhunter.github.io/images/kvm-install-2/2.png">
+<meta property="og:image" content="http://royhunter.github.io/images/kvm-install-2/3.png">
+<meta property="og:image" content="http://royhunter.github.io/images/kvm-install-2/4.png">
+<meta property="og:image" content="http://royhunter.github.io/images/kvm-install-2/5.png">
+<meta property="og:image" content="http://royhunter.github.io/images/kvm-install-2/6.png">
+<meta property="og:image" content="http://royhunter.github.io/images/kvm-install-2/18.png">
+<meta property="og:image" content="http://royhunter.github.io/images/kvm-install-2/17.png">
+<meta property="og:image" content="http://royhunter.github.io/images/kvm-install-2/11.png">
+<meta property="og:image" content="http://royhunter.github.io/images/kvm-install-2/12.png">
+<meta property="og:image" content="http://royhunter.github.io/images/kvm-install-2/13.png">
+<meta property="og:image" content="http://royhunter.github.io/images/kvm-install-2/14.png">
+<meta property="og:updated_time" content="2019-11-08T02:32:11.010Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="KVM安装与启动过程说明-Kernel源码编译方式">
 <meta name="twitter:description" content="《kvm安装与启动过程说明》进行了通用桌面系统的虚拟机安装。在本文中将介绍自行编译linux Kernel内核源码，无桌面OS虚拟机安装和启动。为后续内核调试打下基础。">
-<meta name="twitter:image" content="http://7j1zng.com1.z0.glb.clouddn.com/1.png">
+<meta name="twitter:image" content="http://royhunter.github.io/images/kvm-install-2/1.png">
     
 
     
@@ -292,14 +292,14 @@
 <p>配置Virtualization项-&gt;</p>
 <p>选择Kernel_based virtual Machine (KVM) support/<br>KVM for Intel processors support两项</p>
 <p>配置kernel-hacking项-&gt;<br>选择compile kernel with debug info</p>
-<p><img src="http://7j1zng.com1.z0.glb.clouddn.com/1.png" alt=""></p>
+<p><img src="/images/kvm-install-2/1.png" alt=""></p>
 <p>选择KVM支持与Intel 处理器。</p>
-<p><img src="http://7j1zng.com1.z0.glb.clouddn.com/2.png" alt=""></p>
+<p><img src="/images/kvm-install-2/2.png" alt=""></p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$make</span> bzImage   //生成bzImage内核镜像</span><br></pre></td></tr></table></figure>
 <p>开始编译，编译完的结果如图：</p>
 <p>主要的文件为vmlinux:  编译出来的最原始的内核文件，未压缩;</p>
 <p>./arch/x86/boot/bzImage:  经过压缩后的img文件，比较大；</p>
-<p><img src="http://7j1zng.com1.z0.glb.clouddn.com/3.png" alt=""></p>
+<p><img src="/images/kvm-install-2/3.png" alt=""></p>
 <h2 id="4-BusyBox编译和安装"><a href="#4-BusyBox编译和安装" class="headerlink" title="4. BusyBox编译和安装"></a>4. BusyBox编译和安装</h2><p>该工具用来制作initramfs镜像文件。</p>
 <h3 id="4-1-下载源码"><a href="#4-1-下载源码" class="headerlink" title="4.1    下载源码"></a>4.1    下载源码</h3><ol>
 <li>链接：<a href="http://www.busybox.net" target="_blank" rel="noopener">http://www.busybox.net</a>  文件为busybox-1.22.1.tar.gz2</li>
@@ -312,9 +312,9 @@
 <pre><code>Busybox Settings ---&gt;
     Build Options ---&gt;
         [*] Build BusyBox as a static binary(no shared libs)
-</code></pre><p><img src="http://7j1zng.com1.z0.glb.clouddn.com/4.png" alt=""></p>
-<p><img src="http://7j1zng.com1.z0.glb.clouddn.com/5.png" alt=""></p>
-<p><img src="http://7j1zng.com1.z0.glb.clouddn.com/6.png" alt=""></p>
+</code></pre><p><img src="/images/kvm-install-2/4.png" alt=""></p>
+<p><img src="/images/kvm-install-2/5.png" alt=""></p>
+<p><img src="/images/kvm-install-2/6.png" alt=""></p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$make</span></span><br><span class="line"><span class="variable">$make</span> install</span><br></pre></td></tr></table></figure>
 <h3 id="4-3-制作initramfs"><a href="#4-3-制作initramfs" class="headerlink" title="4.3    制作initramfs"></a>4.3    制作initramfs</h3><ul>
 <li>编写initrd启动脚本,$BUSYBOX为busybox包解压后的目录</li>
@@ -337,17 +337,17 @@
 <li>成功后会在当前目录下生产rootfs.img.gz文件</li>
 </ul>
 <h2 id="5-Guest-OS的安装运行"><a href="#5-Guest-OS的安装运行" class="headerlink" title="5. Guest OS的安装运行"></a>5. Guest OS的安装运行</h2><h3 id="5-1-启动命令"><a href="#5-1-启动命令" class="headerlink" title="5.1    启动命令"></a>5.1    启动命令</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$sudo</span> /usr/<span class="built_in">local</span>/kvm/bin/qemu-system-x86_64 -kernel \</span><br><span class="line">	./kvm_guest/bzImage -initrd rootfs.img -append <span class="string">"root=/dev/ram rdinit=sbin/init noapic"</span></span><br></pre></td></tr></table></figure>
-<h3 id="5-2-参数解释"><a href="#5-2-参数解释" class="headerlink" title="5.2    参数解释"></a>5.2    参数解释</h3><p><img src="http://7j1zng.com1.z0.glb.clouddn.com/18.png" alt=""></p>
-<h3 id="5-3-运行结果"><a href="#5-3-运行结果" class="headerlink" title="5.3    运行结果"></a>5.3    运行结果</h3><p><img src="http://7j1zng.com1.z0.glb.clouddn.com/17.png" alt=""></p>
+<h3 id="5-2-参数解释"><a href="#5-2-参数解释" class="headerlink" title="5.2    参数解释"></a>5.2    参数解释</h3><p><img src="/images/kvm-install-2/18.png" alt=""></p>
+<h3 id="5-3-运行结果"><a href="#5-3-运行结果" class="headerlink" title="5.3    运行结果"></a>5.3    运行结果</h3><p><img src="/images/kvm-install-2/17.png" alt=""></p>
 <p>输入uname –a:</p>
-<p><img src="http://7j1zng.com1.z0.glb.clouddn.com/11.png" alt=""></p>
+<p><img src="/images/kvm-install-2/11.png" alt=""></p>
 <p>输入cat /proc/cpuinfo:</p>
-<p><img src="http://7j1zng.com1.z0.glb.clouddn.com/12.png" alt=""></p>
+<p><img src="/images/kvm-install-2/12.png" alt=""></p>
 <p>输入 cat /proc/meminfo:</p>
-<p><img src="http://7j1zng.com1.z0.glb.clouddn.com/13.png" alt=""></p>
+<p><img src="/images/kvm-install-2/13.png" alt=""></p>
 <p>启动命令加入-smp 4选项后</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$cat</span> /proc/cpuinfo</span><br></pre></td></tr></table></figure>
-<p><img src="http://7j1zng.com1.z0.glb.clouddn.com/14.png" alt=""></p>
+<p><img src="/images/kvm-install-2/14.png" alt=""></p>
 
         
         </div>
@@ -358,7 +358,7 @@
 
 </div>
 
-    <a data-url="http://royhunter.github.io/2014/06/16/kvm-install-2/" data-id="ck2okz6k2001uoukv1yrs15or" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+    <a data-url="http://royhunter.github.io/2014/06/16/kvm-install-2/" data-id="ck2pi7jqa001ldlkv3c94n0g5" class="article-share-link"><i class="fas fa-share"></i>Share</a>
 <script>
     (function ($) {
         // Prevent duplicate binding

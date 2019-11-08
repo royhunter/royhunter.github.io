@@ -13,12 +13,12 @@
 <meta property="og:site_name" content="RoyLuo&#39;s Notes">
 <meta property="og:description" content="谈了很多KVM的实现细节，了解了如何使用qemu进行虚拟机的配置和创建，但是qemu提供的命令行参数过于复杂，不便于理解和操作。所以在技术上就有了更好的虚拟机管理工具libvirt。libvirt是目前用的比较多的对KVM进行管理的虚拟化管理工具。其也支持其他虚拟化平台，并且提供了一整套API，提供了对虚拟机的管理，也提供了对虚拟化网络和存储的管理。">
 <meta property="og:locale" content="en">
-<meta property="og:image" content="http://7xogux.com1.z0.glb.clouddn.com/4.png">
-<meta property="og:updated_time" content="2015-12-05T13:58:58.000Z">
+<meta property="og:image" content="http://royhunter.github.io/images/libvirt1/4.png">
+<meta property="og:updated_time" content="2019-11-08T02:35:26.749Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Libvirt Introduce">
 <meta name="twitter:description" content="谈了很多KVM的实现细节，了解了如何使用qemu进行虚拟机的配置和创建，但是qemu提供的命令行参数过于复杂，不便于理解和操作。所以在技术上就有了更好的虚拟机管理工具libvirt。libvirt是目前用的比较多的对KVM进行管理的虚拟化管理工具。其也支持其他虚拟化平台，并且提供了一整套API，提供了对虚拟机的管理，也提供了对虚拟化网络和存储的管理。">
-<meta name="twitter:image" content="http://7xogux.com1.z0.glb.clouddn.com/4.png">
+<meta name="twitter:image" content="http://royhunter.github.io/images/libvirt1/4.png">
     
 
     
@@ -228,7 +228,7 @@
         
             
 	
-		<img src="http://7xogux.com1.z0.glb.clouddn.com/4.png" class="article-banner" />
+		<img src="/images/libvirt1/4.png" class="article-banner" />
 	
 
 
@@ -280,7 +280,7 @@
 <p>Libvirt是一个开源软件，使用的许可证是LGPL（Lesser General Public License）。</p>
 <p>Reference: <a href="http://libvirt.org/" target="_blank" rel="noopener">http://libvirt.org/</a></p>
 <h2 id="Run-Level"><a href="#Run-Level" class="headerlink" title="Run Level"></a>Run Level</h2><p>Libvirt的主要目标是为各种虚拟化工具提供一套方便、可靠的编程接口，用一种单一的方式管理多种不同的虚拟化提供方式.<br>从下图中看到，libvirt作为user-space管理工具与Hypervisor之间的适配层。让底层Hypervisor对上层用户空间的管理工具是可以做到完全透明的，因为libvirt屏蔽了底层各种Hypervisor的细节，为上层管理工具提供了一个统一的、较稳定的接口（API）。通过libvirt，一些用户空间管理工具可以管理各种不同的Hypervisor和上面运行的vm. 如下图所示：</p>
-<p><img src="http://7xogux.com1.z0.glb.clouddn.com/1.png" alt=""></p>
+<p><img src="/images/libvirt1/1.png" alt=""></p>
 <h2 id="Glossary-of-terms"><a href="#Glossary-of-terms" class="headerlink" title="Glossary of terms"></a>Glossary of terms</h2><p>理解libvirt，就需要了解一些libvirt中经常用到的一些概念和术语：</p>
 <h3 id="Domain"><a href="#Domain" class="headerlink" title="Domain"></a>Domain</h3><p>An instance of an operating system (or subsystem in the case of container  virtualization) running on a virtualized machine provided by the hypervisor.<br>一个操作系统的实例，可以理解为一个guest vm。</p>
 <h3 id="Hypervisor"><a href="#Hypervisor" class="headerlink" title="Hypervisor"></a>Hypervisor</h3><p>A layer of software allowing virtualization of a node in a set of virtual machines,  which may have different configurations to the node itself.<br>VMM.</p>
@@ -302,7 +302,7 @@
 </li>
 </ul>
 <h3 id="Driver-model"><a href="#Driver-model" class="headerlink" title="Driver model"></a>Driver model</h3><p>libvirt对多种不同的Hypervisor的支持是通过一种基于驱动程序的架构来实现的。libvirt对不同的Hypervisor提供了不同的驱动.<br>Hypervisor drivers:<br>Xen:   Example local URI scheme xen:///.<br>QEMU:    Example privileged URI scheme qemu:///system.<br>UML:     Example privileged URI scheme uml:///system.<br>OpenVZ:   Example privileged URI scheme openvz:///system<br>LXC:    Example privileged<br>URI scheme lxc:///</p>
-<p><img src="http://7xogux.com1.z0.glb.clouddn.com/2.png" alt=""></p>
+<p><img src="/images/libvirt1/2.png" alt=""></p>
 <h2 id="Libvirt-Component"><a href="#Libvirt-Component" class="headerlink" title="Libvirt Component"></a>Libvirt Component</h2><p>libvirt主要由三个部分组成，它们分别是：应用程序编程接口（API）库、一个守护进程（libvirtd）和一个默认命令行管理工具（virsh）.</p>
 <ol>
 <li>应用程序接口（API）是为了其他虚拟机管理工具（如virsh、virt-manager等）提供虚拟机管理的程序库支持。</li>
@@ -320,7 +320,7 @@
 
 </div>
 
-    <a data-url="http://royhunter.github.io/2015/11/19/libvirt1/" data-id="ck2okz6jy001joukvmzhdanm5" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+    <a data-url="http://royhunter.github.io/2015/11/19/libvirt1/" data-id="ck2pi7jqc001tdlkvsjybvg3t" class="article-share-link"><i class="fas fa-share"></i>Share</a>
 <script>
     (function ($) {
         // Prevent duplicate binding

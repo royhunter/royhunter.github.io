@@ -13,14 +13,14 @@
 <meta property="og:site_name" content="RoyLuo&#39;s Notes">
 <meta property="og:description" content="和virtio-network一样，virtio-blk驱动使用Virtio机制为Guest提供了一个高性能的块设备I/O的方法。我们这里看下virtio-blk的实现。 Linux中的块设备在介绍virtio-blk之前，先科普下Linux内核中的块设备整体架构。">
 <meta property="og:locale" content="en">
-<meta property="og:image" content="http://7narr6.com1.z0.glb.clouddn.com/1.PNG">
-<meta property="og:image" content="http://7narr6.com1.z0.glb.clouddn.com/2.PNG">
-<meta property="og:image" content="http://7narr6.com1.z0.glb.clouddn.com/3.PNG">
-<meta property="og:updated_time" content="2016-06-25T03:04:36.000Z">
+<meta property="og:image" content="http://royhunter.github.io/images/virtio-blk/1.PNG">
+<meta property="og:image" content="http://royhunter.github.io/images/virtio-blk/2.PNG">
+<meta property="og:image" content="http://royhunter.github.io/images/virtio-blk/3.PNG">
+<meta property="og:updated_time" content="2019-11-08T02:57:59.710Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Virtio-Blk浅析">
 <meta name="twitter:description" content="和virtio-network一样，virtio-blk驱动使用Virtio机制为Guest提供了一个高性能的块设备I/O的方法。我们这里看下virtio-blk的实现。 Linux中的块设备在介绍virtio-blk之前，先科普下Linux内核中的块设备整体架构。">
-<meta name="twitter:image" content="http://7narr6.com1.z0.glb.clouddn.com/1.PNG">
+<meta name="twitter:image" content="http://royhunter.github.io/images/virtio-blk/1.PNG">
     
 
     
@@ -282,7 +282,7 @@
 <li>扇区(Sectors)：任何块设备硬件对数据处理的基本单位。通常，1个扇区的大小为512byte。</li>
 <li>块(Blocks)：由Linux制定对内核或文件系统等数据处理的基本单位。通常，1个块由1个或多个扇区组成。</li>
 </ol>
-<h3 id="整体架构"><a href="#整体架构" class="headerlink" title="整体架构"></a>整体架构</h3><p><img src="http://7narr6.com1.z0.glb.clouddn.com/1.PNG" alt=""></p>
+<h3 id="整体架构"><a href="#整体架构" class="headerlink" title="整体架构"></a>整体架构</h3><p><img src="/images/virtio-blk/1.PNG" alt=""></p>
 <p>相关说明：</p>
 <ol>
 <li>通用块层(Generic Block Layer)负责维持一个I/O请求在上层文件系统与底层物理磁盘之间的关系。在通用块层中，<strong>通常用一个bio结构体来对应一个I/O请求</strong>。</li>
@@ -346,7 +346,7 @@
 <li>完善disk信息，将virtio blk的disk信息注册至块设备层同一管理 </li>
 </ul>
 <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">vblk-&gt;disk-&gt;major = major;</span><br><span class="line">vblk-&gt;disk-&gt;first_minor = index_to_minor(index);</span><br><span class="line">vblk-&gt;disk-&gt;private_data = vblk;</span><br><span class="line">vblk-&gt;disk-&gt;fops = &amp;virtblk_fops;</span><br><span class="line">vblk-&gt;disk-&gt;driverfs_dev = &amp;vdev-&gt;dev;</span><br><span class="line">vblk-&gt;index = index;</span><br><span class="line">add_disk(vblk-&gt;disk);</span><br></pre></td></tr></table></figure>
-<p><img src="http://7narr6.com1.z0.glb.clouddn.com/2.PNG" alt=""></p>
+<p><img src="/images/virtio-blk/2.PNG" alt=""></p>
 <h3 id="数据处理"><a href="#数据处理" class="headerlink" title="数据处理"></a>数据处理</h3><h4 id="后端—–-gt-前端"><a href="#后端—–-gt-前端" class="headerlink" title="后端—–&gt;前端"></a>后端—–&gt;前端</h4><p>virtio_blk结构体中的gendisk结构的request_queue队列接收block层的bio请求，按照request_queue队列默认处理过程，bio请求会在io调度层转化为request，然后进入request_queue队列，最后调用virtblk_request将request转化为vbr结构。</p>
 <pre><code>virtio_queue_rq()                &lt;---- 注册于request_queue结构的queue_rq成员
     ---&gt;blk_rq_map_sg()          &lt;---- 将vbr填入scatter-list中
@@ -358,7 +358,7 @@
 <pre><code>virtblk_done()
     ---&gt;blk_mq_complete_request()
 </code></pre><p>最后由request_queue注册的complete函数virtblk_request_done()处理，通过blk_mq_end_io()通告块设备层IO结束。</p>
-<h3 id="request生命周期的图示"><a href="#request生命周期的图示" class="headerlink" title="request生命周期的图示"></a>request生命周期的图示</h3><p><img src="http://7narr6.com1.z0.glb.clouddn.com/3.PNG" alt=""></p>
+<h3 id="request生命周期的图示"><a href="#request生命周期的图示" class="headerlink" title="request生命周期的图示"></a>request生命周期的图示</h3><p><img src="/images/virtio-blk/3.PNG" alt=""></p>
 <h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ol>
 <li>“深入理解Linux内核”</li>
 <li>“2012-forum-virtio-blk-performance-improvement.pdf”</li>
@@ -373,7 +373,7 @@
 
 </div>
 
-    <a data-url="http://royhunter.github.io/2014/08/29/virtio-blk/" data-id="ck2okz6kt003soukvda1hujk6" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+    <a data-url="http://royhunter.github.io/2014/08/29/virtio-blk/" data-id="ck2pi7jqx003pdlkvujm2ndys" class="article-share-link"><i class="fas fa-share"></i>Share</a>
 <script>
     (function ($) {
         // Prevent duplicate binding

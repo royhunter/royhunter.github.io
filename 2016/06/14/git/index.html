@@ -13,15 +13,15 @@
 <meta property="og:site_name" content="RoyLuo&#39;s Notes">
 <meta property="og:description" content="常用Git命令总结与速查笔记">
 <meta property="og:locale" content="en">
-<meta property="og:image" content="http://royhunter.github.io/images/git_full.PNG">
-<meta property="og:image" content="http://royhunter.github.io/images/git_trans.PNG">
-<meta property="og:image" content="http://7j1zal.com1.z0.glb.clouddn.com/branch_1.PNG">
-<meta property="og:image" content="http://7j1zal.com1.z0.glb.clouddn.com/branch_2.PNG">
-<meta property="og:updated_time" content="2019-11-07T10:40:23.482Z">
+<meta property="og:image" content="http://royhunter.github.io/images/roy-luoye-img/git_full.PNG">
+<meta property="og:image" content="http://royhunter.github.io/images/roy-luoye-img/git_trans.PNG">
+<meta property="og:image" content="http://royhunter.github.io/images/roy-luoye-img/branch_1.PNG">
+<meta property="og:image" content="http://royhunter.github.io/images/roy-luoye-img/branch_2.PNG">
+<meta property="og:updated_time" content="2019-11-08T02:18:01.589Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="常用Git命令速查笔记">
 <meta name="twitter:description" content="常用Git命令总结与速查笔记">
-<meta name="twitter:image" content="http://royhunter.github.io/images/git_full.PNG">
+<meta name="twitter:image" content="http://royhunter.github.io/images/roy-luoye-img/git_full.PNG">
     
 
     
@@ -272,7 +272,7 @@
             <p>常用Git命令总结与速查笔记</p>
 <a id="more"></a> 
 <p>参考文档: “Pro Git—Scott Chacon”</p>
-<h2 id="Git基础操作"><a href="#Git基础操作" class="headerlink" title="Git基础操作"></a>Git基础操作</h2><p>几幅有助于理解GIT操作流程的示意图：<br><img src="/images/git_full.PNG" alt=""><br><img src="/images/git_trans.PNG" alt=""></p>
+<h2 id="Git基础操作"><a href="#Git基础操作" class="headerlink" title="Git基础操作"></a>Git基础操作</h2><p>几幅有助于理解GIT操作流程的示意图：<br><img src="/images/roy-luoye-img/git_full.PNG" alt=""><br><img src="/images/roy-luoye-img/git_trans.PNG" alt=""></p>
 <h3 id="创建项目的Git仓库"><a href="#创建项目的Git仓库" class="headerlink" title="创建项目的Git仓库"></a>创建项目的Git仓库</h3><h4 id="从当前目录初始化"><a href="#从当前目录初始化" class="headerlink" title="从当前目录初始化"></a>从当前目录初始化</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">$ git init                 将当前目录初始化为git仓库</span><br><span class="line">$ git init [project-name]  新建一个目录，将其初始化为Git代码库</span><br></pre></td></tr></table></figure>
 <p>初始化后，在当前目录下会出现一个名为.git的目录，所有Git需要的数据和资源都存放在这个目录中。</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">$ git add [file]              添加到暂存区</span><br><span class="line">$ git commit -m <span class="string">'comments'</span>    check <span class="keyword">in</span>到仓库</span><br></pre></td></tr></table></figure>
@@ -287,7 +287,7 @@
 <h4 id="撤销暂存区的文件（即撤销已经git-add操作）"><a href="#撤销暂存区的文件（即撤销已经git-add操作）" class="headerlink" title="撤销暂存区的文件（即撤销已经git add操作）"></a>撤销暂存区的文件（即撤销已经git add操作）</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ git reset HEAD &lt;file&gt;</span><br></pre></td></tr></table></figure>
 <h4 id="取消对文件的修改"><a href="#取消对文件的修改" class="headerlink" title="取消对文件的修改"></a>取消对文件的修改</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ git checkout -- &lt;file&gt;</span><br></pre></td></tr></table></figure>
 <h4 id="在历史版本之间切换"><a href="#在历史版本之间切换" class="headerlink" title="在历史版本之间切换"></a>在历史版本之间切换</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">$ git reflog          查看命令历史， 可以显示历史commit id</span><br><span class="line">$ git reset --hard [commit_id]</span><br></pre></td></tr></table></figure>
-<h2 id="Git-分支"><a href="#Git-分支" class="headerlink" title="Git 分支"></a>Git 分支</h2><p><img src="http://7j1zal.com1.z0.glb.clouddn.com/branch_1.PNG" alt=""><br><img src="http://7j1zal.com1.z0.glb.clouddn.com/branch_2.PNG" alt=""></p>
+<h2 id="Git-分支"><a href="#Git-分支" class="headerlink" title="Git 分支"></a>Git 分支</h2><p><img src="/images/roy-luoye-img/branch_1.PNG" alt=""><br><img src="/images/roy-luoye-img/branch_2.PNG" alt=""></p>
 <h3 id="查看分支信息"><a href="#查看分支信息" class="headerlink" title="查看分支信息"></a>查看分支信息</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">$ git branch      list所有本地分支</span><br><span class="line">$ git branch -r   list所有远程分支</span><br><span class="line">$ git branch -a   list所有分支</span><br></pre></td></tr></table></figure>
 <h3 id="新建分支"><a href="#新建分支" class="headerlink" title="新建分支"></a>新建分支</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">$ git branch [branch-name]    新建一个分支，但依然停留在当前分支</span><br><span class="line">$ git checkout -b [branch]    新建一个分支, 并切换到该分支</span><br></pre></td></tr></table></figure>
 <h3 id="切换分支"><a href="#切换分支" class="headerlink" title="切换分支"></a>切换分支</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ git checkout [branch-name]    切换到指定分支</span><br></pre></td></tr></table></figure>
@@ -320,7 +320,7 @@
 
 </div>
 
-    <a data-url="http://royhunter.github.io/2016/06/14/git/" data-id="ck2okz6jq000youkv159pyuqj" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+    <a data-url="http://royhunter.github.io/2016/06/14/git/" data-id="ck2pi7jpz000qdlkv9lcpdp1c" class="article-share-link"><i class="fas fa-share"></i>Share</a>
 <script>
     (function ($) {
         // Prevent duplicate binding

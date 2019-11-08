@@ -13,12 +13,12 @@
 <meta property="og:site_name" content="RoyLuo&#39;s Notes">
 <meta property="og:description" content="之前只使用过Golang的协程，听说过Lua的协程，这里第一次在qemu中看到C语言也可以实现自己的协程，qemu在对块数据的读写过程中大量使用了协程，借此对C版的协程相关做一个分析和记录。">
 <meta property="og:locale" content="en">
-<meta property="og:image" content="http://7j1zal.com1.z0.glb.clouddn.com/qemu-coroutine.PNG">
-<meta property="og:updated_time" content="2016-06-28T14:26:54.000Z">
+<meta property="og:image" content="http://royhunter.github.io/images/roy-luoye-img/qemu-coroutine.PNG">
+<meta property="og:updated_time" content="2019-11-08T02:44:31.593Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="QEMU中的协程---qemu-coroutine">
 <meta name="twitter:description" content="之前只使用过Golang的协程，听说过Lua的协程，这里第一次在qemu中看到C语言也可以实现自己的协程，qemu在对块数据的读写过程中大量使用了协程，借此对C版的协程相关做一个分析和记录。">
-<meta name="twitter:image" content="http://7j1zal.com1.z0.glb.clouddn.com/qemu-coroutine.PNG">
+<meta name="twitter:image" content="http://royhunter.github.io/images/roy-luoye-img/qemu-coroutine.PNG">
     
 
     
@@ -289,7 +289,7 @@
 <p>若co-&gt;entry(co-&gt;entry_arg)中使用qemu_coroutine_yield<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> coroutine_fn <span class="title">qemu_coroutine_yield</span><span class="params">(<span class="keyword">void</span>)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    Coroutine *self = qemu_coroutine_self();</span><br><span class="line">    Coroutine *to = self-&gt;caller;</span><br><span class="line"></span><br><span class="line">    trace_qemu_coroutine_yield(self, to);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (!to) &#123;</span><br><span class="line">        <span class="built_in">fprintf</span>(<span class="built_in">stderr</span>, <span class="string">"Co-routine is yielding to no one\n"</span>);</span><br><span class="line">        <span class="built_in">abort</span>();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    self-&gt;caller = <span class="literal">NULL</span>;</span><br><span class="line">    coroutine_swap(self, to);   <span class="comment">//此处self为新协程，to为主协程</span></span><br><span class="line">&#125;</span><br><span class="line">再次通过coroutine_swap操作来进行切换：</span><br><span class="line"><span class="function">CoroutineAction <span class="title">qemu_coroutine_switch</span><span class="params">(Coroutine *from_, Coroutine *to_,</span></span></span><br><span class="line"><span class="function"><span class="params">                                      CoroutineAction action)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    CoroutineUContext *from = DO_UPCAST(CoroutineUContext, base, from_);</span><br><span class="line">    CoroutineUContext *to = DO_UPCAST(CoroutineUContext, base, to_);</span><br><span class="line">    CoroutineThreadState *s = coroutine_get_thread_state();</span><br><span class="line">    <span class="keyword">int</span> ret;</span><br><span class="line"></span><br><span class="line">    s-&gt;current = to_;</span><br><span class="line"></span><br><span class="line">    ret = setjmp(from-&gt;env);  <span class="comment">//保存当前上下文到from的evn即新协程的env，此处的调用栈为qemu_coroutine_yield的内部</span></span><br><span class="line">    <span class="keyword">if</span> (ret == <span class="number">0</span>) &#123;</span><br><span class="line">        longjmp(to-&gt;env, action); <span class="comment">//切换至主协程的上下文，在上面enter的分析中可以得到，此时主协程的上下文在qemu_coroutine_enter中。</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> ret;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
 <p>这样yield处的上下文被保存在新协程的env中，而程序逻辑调回了qemu_coroutine_enter中继续执行，即从qemu_coroutine_enter退出。</p>
 <p>在适当的时机，再次调用qemu_coroutine_enter则会恢复yield处的上下文继续执行。</p>
-<p><img src="http://7j1zal.com1.z0.glb.clouddn.com/qemu-coroutine.PNG" alt=""></p>
+<p><img src="/images/roy-luoye-img/qemu-coroutine.PNG" alt=""></p>
 <h2 id="基于ucontext的实现（云风）"><a href="#基于ucontext的实现（云风）" class="headerlink" title="基于ucontext的实现（云风）"></a>基于ucontext的实现（云风）</h2><p><a href="https://github.com/cloudwu/coroutine/" target="_blank" rel="noopener">https://github.com/cloudwu/coroutine/</a></p>
 
         
@@ -301,7 +301,7 @@
 
 </div>
 
-    <a data-url="http://royhunter.github.io/2016/06/24/qemu-coroutine/" data-id="ck2okz6kf002toukvnnn3ktv6" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+    <a data-url="http://royhunter.github.io/2016/06/24/qemu-coroutine/" data-id="ck2pi7jqn002vdlkvp176yk51" class="article-share-link"><i class="fas fa-share"></i>Share</a>
 <script>
     (function ($) {
         // Prevent duplicate binding

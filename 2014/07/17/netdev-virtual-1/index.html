@@ -13,14 +13,14 @@
 <meta property="og:site_name" content="RoyLuo&#39;s Notes">
 <meta property="og:description" content="KVM在I/O虚拟化方面，传统的方式是使用Qemu纯软件的方式来模拟I/O设备，其中包括经常使用的网卡设备。这次我们重点分析Qemu为实现网络设备虚拟化的全虚拟化方案。本主题从三个组成方面来完整描述，包括：1. 前端网络流的建立； 2. 虚拟网卡的创建； 3. 网络I/O虚拟化 in Guest OS。本篇主要讲述“前端网络流的建立”。">
 <meta property="og:locale" content="en">
-<meta property="og:image" content="http://7ktrxu.com1.z0.glb.clouddn.com/1.png">
-<meta property="og:image" content="http://7ktrxu.com1.z0.glb.clouddn.com/2.png">
-<meta property="og:image" content="http://7ktrxu.com1.z0.glb.clouddn.com/3.png">
-<meta property="og:updated_time" content="2016-06-25T04:05:06.000Z">
+<meta property="og:image" content="http://royhunter.github.io/images/io-1/1.png">
+<meta property="og:image" content="http://royhunter.github.io/images/io-1/2.png">
+<meta property="og:image" content="http://royhunter.github.io/images/io-1/3.png">
+<meta property="og:updated_time" content="2019-11-08T02:39:08.040Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Qemu之Network Device全虚拟方案一:前端网络流的建立">
 <meta name="twitter:description" content="KVM在I/O虚拟化方面，传统的方式是使用Qemu纯软件的方式来模拟I/O设备，其中包括经常使用的网卡设备。这次我们重点分析Qemu为实现网络设备虚拟化的全虚拟化方案。本主题从三个组成方面来完整描述，包括：1. 前端网络流的建立； 2. 虚拟网卡的创建； 3. 网络I/O虚拟化 in Guest OS。本篇主要讲述“前端网络流的建立”。">
-<meta name="twitter:image" content="http://7ktrxu.com1.z0.glb.clouddn.com/1.png">
+<meta name="twitter:image" content="http://royhunter.github.io/images/io-1/1.png">
     
 
     
@@ -285,7 +285,7 @@
 <p>Linux网桥的具体实现可以参看我以前总结的关于网桥的流程分析：<a href="http://blog.csdn.net/hsly_support/article/details/8762896" target="_blank" rel="noopener">http://blog.csdn.net/hsly_support/article/details/8762896 </a></p>
 <h3 id="网桥的创建"><a href="#网桥的创建" class="headerlink" title="网桥的创建"></a>网桥的创建</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$brctl</span> addbr br0         <span class="comment">#添加br0这个bridge</span></span><br><span class="line"><span class="variable">$brctl</span> addif br0 eth0    <span class="comment">#将br0与eth0绑定起来</span></span><br></pre></td></tr></table></figure>
 <p>通过上述两条命令，bridge br0成为连接本机与外部网络的接口。</p>
-<p><img src="http://7ktrxu.com1.z0.glb.clouddn.com/1.png" alt=""></p>
+<p><img src="/images/io-1/1.png" alt=""></p>
 <h2 id="Tap的原理与创建"><a href="#Tap的原理与创建" class="headerlink" title="Tap的原理与创建"></a>Tap的原理与创建</h2><p>qemu-system-x86_64命令关于bridge模式的网络参数如下：</p>
 <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">-net tap[,vlan=n][,name=str][,fd=h][,ifname=name][,script=file][,downscript=dfile][,helper=helper][,sndbuf=nbytes][,vnet_hdr=on|off][,vhost=on|off][,vhostfd=h][,vhostforce=on|off]</span><br></pre></td></tr></table></figure>
 <p>主要参数说明：</p>
@@ -328,7 +328,7 @@ sndbuf=nbytes: 限制TAP设备的发送缓冲区大小为n字节，当需要流�
 </code></pre><p>可以看到最后Tap设备的事件通知加入了io_handlers的事件监听列表中，fd_read事件对应的动作为tap_send(),fd_write事件对应的动作为tap_writable()。</p>
 <p>Tap设备接口加入网桥命令：</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$brctl</span> addif br0 tap1</span><br></pre></td></tr></table></figure>
-<p><img src="http://7ktrxu.com1.z0.glb.clouddn.com/2.png" alt=""></p>
+<p><img src="/images/io-1/2.png" alt=""></p>
 <h3 id="Qemu主线程中的事件监听"><a href="#Qemu主线程中的事件监听" class="headerlink" title="Qemu主线程中的事件监听"></a>Qemu主线程中的事件监听</h3><p>io_handlers的事件监听在哪里发生呢？</p>
 <p>Qemu的Main函数通过一系列的初始化，并创建线程进行VM的启动，最后来到了main_loop()(file: vl.c, line: 3790)</p>
 <pre><code>main_loop()  file: vl.c, line: 1631
@@ -337,7 +337,7 @@ sndbuf=nbytes: 限制TAP设备的发送缓冲区大小为n字节，当需要流�
         os_host_main_loop_wait()  file: main-loop.c, line: 291
             select(nfds + 1, &amp;rfds, &amp;wfds, &amp;xfds, tvarg)   &lt;----此处对注册的源进行监听，包括Tap fd;
         qemu_iohandler_poll()  file: io_handler.c, line: 115 &lt;---调用事件对应动作进行处理；
-</code></pre><h2 id="前端网络数据流程"><a href="#前端网络数据流程" class="headerlink" title="前端网络数据流程"></a>前端网络数据流程</h2><p><img src="http://7ktrxu.com1.z0.glb.clouddn.com/3.png" alt=""></p>
+</code></pre><h2 id="前端网络数据流程"><a href="#前端网络数据流程" class="headerlink" title="前端网络数据流程"></a>前端网络数据流程</h2><p><img src="/images/io-1/3.png" alt=""></p>
 <p>如图中所示，红色箭头表示数据报文的入方向，步骤：</p>
 <ol>
 <li>网络数据从Host上的物理网卡接收，到达网桥； </li>
@@ -357,7 +357,7 @@ sndbuf=nbytes: 限制TAP设备的发送缓冲区大小为n字节，当需要流�
 
 </div>
 
-    <a data-url="http://royhunter.github.io/2014/07/17/netdev-virtual-1/" data-id="ck2okz6k8002aoukvq2aocqng" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+    <a data-url="http://royhunter.github.io/2014/07/17/netdev-virtual-1/" data-id="ck2pi7jqe0021dlkvlf3b3qui" class="article-share-link"><i class="fas fa-share"></i>Share</a>
 <script>
     (function ($) {
         // Prevent duplicate binding

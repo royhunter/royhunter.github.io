@@ -13,14 +13,14 @@
 <meta property="og:site_name" content="RoyLuo&#39;s Notes">
 <meta property="og:description" content="前面两文主要对前端网络流的数据路径和虚拟网卡的创建进行了说明，这些可以看做是Guest OS网络数据包收发的准备工作，那么网络数据包是如何在Guest OS中进进出出的呢，本文就是重点讲述Guest OS的数据包的收发路径，其中涉及到一个重要的虚拟化技术，即I/O虚拟化。">
 <meta property="og:locale" content="en">
-<meta property="og:image" content="http://7ktw21.com1.z0.glb.clouddn.com/1.png">
-<meta property="og:image" content="http://7ktw21.com1.z0.glb.clouddn.com/2.png">
-<meta property="og:image" content="http://7ktw21.com1.z0.glb.clouddn.com/3.png">
-<meta property="og:updated_time" content="2016-06-25T04:00:50.000Z">
+<meta property="og:image" content="http://royhunter.github.io/images/io-3/1.png">
+<meta property="og:image" content="http://royhunter.github.io/images/io-3/2.png">
+<meta property="og:image" content="http://royhunter.github.io/images/io-3/3.png">
+<meta property="og:updated_time" content="2019-11-08T02:40:12.942Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Qemu之Network Device全虚拟方案三:I&#x2F;O虚拟化">
 <meta name="twitter:description" content="前面两文主要对前端网络流的数据路径和虚拟网卡的创建进行了说明，这些可以看做是Guest OS网络数据包收发的准备工作，那么网络数据包是如何在Guest OS中进进出出的呢，本文就是重点讲述Guest OS的数据包的收发路径，其中涉及到一个重要的虚拟化技术，即I/O虚拟化。">
-<meta name="twitter:image" content="http://7ktw21.com1.z0.glb.clouddn.com/1.png">
+<meta name="twitter:image" content="http://royhunter.github.io/images/io-3/1.png">
     
 
     
@@ -271,7 +271,7 @@
             <p>前面两文主要对前端网络流的数据路径和虚拟网卡的创建进行了说明，这些可以看做是Guest OS网络数据包收发的准备工作，那么网络数据包是如何在Guest OS中进进出出的呢，本文就是重点讲述Guest OS的数据包的收发路径，其中涉及到一个重要的虚拟化技术，即I/O虚拟化。</p>
 <a id="more"></a>
 <h2 id="Guest-OS中网络数据包的接收"><a href="#Guest-OS中网络数据包的接收" class="headerlink" title="Guest OS中网络数据包的接收"></a>Guest OS中网络数据包的接收</h2><p>前文我们讲到Qemu主线程通过监听Tap设备文件读写事件来收发数据包，当有属于Guest OS的数据包在Host中收到后，Host根据配置通过Bridge，Tap设备来到了Qeumu的用户态空间，Qemu通过调用了预先注册的Tap的读事件处理函数进行处理，如下图：</p>
-<p><img src="http://7ktw21.com1.z0.glb.clouddn.com/1.png" alt=""></p>
+<p><img src="/images/io-3/1.png" alt=""></p>
 <pre><code>tap_send()         file: tap.c, line: 192
     tap_read_packet()     通过read从/net/dev/tun的fd中读取数据包
     qemu_send_packet_async()     file: net.c, line: 384
@@ -301,10 +301,10 @@
 <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">e1000_receive(NetClientState *nc, <span class="keyword">const</span> <span class="keyword">uint8_t</span> *buf, <span class="keyword">size_t</span> size)</span><br><span class="line">&#123;</span><br><span class="line">	E1000State *s = DO_UPCAST(NICState, nc, nc)-&gt;opaque;  <span class="comment">//获取e1000的状态控制结构</span></span><br><span class="line">	                                 <span class="comment">//	E1000Stat很重要，其中包含了所有e1000硬件相关的寄存器信息，数据包描述符信息</span></span><br><span class="line">	......</span><br><span class="line">	base = rx_desc_base(s) + <span class="keyword">sizeof</span>(desc) * s-&gt;mac_reg[RDH];</span><br><span class="line">	......</span><br><span class="line">	pci_dma_write(&amp;s-&gt;dev, le64_to_cpu(desc.buffer_addr),</span><br><span class="line">                              buf + desc_offset + vlan_offset, copy_size);</span><br><span class="line">    ......</span><br><span class="line">    pci_dma_write(&amp;s-&gt;dev, base, &amp;desc, <span class="keyword">sizeof</span>(desc));</span><br><span class="line">    ......</span><br><span class="line">    set_ics(s, <span class="number">0</span>, n);    <span class="comment">//触发中断</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <p>有上述函数过程的可以看到，数据包从buf中通过pci_dma_write接口注入到了e1000的数据包接收内存中，当然这里的dma并不是真正的硬件DMA操作，而是虚拟化成普通内存的写，因为Guest OS的物理内存是Qemu的虚拟内存，因此Qemu可以直接访问，而Guest并不知道这一切。最后通过set_ics进行Guest收包中断的注入。这一块涉及了中断虚拟化，我们后面单独进行分析。</p>
 <p>这样数据包就进入了Guest的物理内存中，收包中断也安排好了，就好像是纯粹的真实的物理网卡到OS的数据流程。而这一切都是全虚拟化应该达到的效果。</p>
-<p><img src="http://7ktw21.com1.z0.glb.clouddn.com/2.png" alt=""></p>
+<p><img src="/images/io-3/2.png" alt=""></p>
 <h2 id="Guest-OS中网络数据包的发送"><a href="#Guest-OS中网络数据包的发送" class="headerlink" title="Guest OS中网络数据包的发送"></a>Guest OS中网络数据包的发送</h2><p>当Guest OS中有数据包要发送时，在全虚拟化情况下，Guest会像通常那样走普通网卡驱动流程，将数据包的内容写入待发送的skbuffer的地址空间中，同时将待发送的skbuffer地址放入发送ring中，配置网卡的发送寄存器就可将数据包发送出去，而在Guest模式下，当Guest访问PIO或者MMIO时会触发VM Exit，进入到Host OS 中的kvm。</p>
 <p>而设备的模拟是在Qemu中进行的，KVM对该中异常退出无法处理，会将该退出原因注入给Qemu来处理，流程可参考“KVM Run Process之KVM核心流程”一文。</p>
-<p><img src="http://7ktw21.com1.z0.glb.clouddn.com/3.png" alt=""></p>
+<p><img src="/images/io-3/3.png" alt=""></p>
 <p>Qemu通过对触发io exit的地址的范围检测，找到对应的PIO/MMIO的地址空间，并调用地址空间注册时的一系列对应寄存器操作处理函数：</p>
 <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> <span class="keyword">const</span> MemoryRegionOps e1000_mmio_ops = &#123;</span><br><span class="line">    .read = e1000_mmio_read,</span><br><span class="line">    .write = e1000_mmio_write,</span><br><span class="line">    .endianness = DEVICE_LITTLE_ENDIAN,</span><br><span class="line">    .impl = &#123;</span><br><span class="line">        .min_access_size = <span class="number">4</span>,</span><br><span class="line">        .max_access_size = <span class="number">4</span>,</span><br><span class="line">    &#125;,</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">static</span> <span class="title">void</span> <span class="params">(*macreg_writeops[])</span><span class="params">(E1000State *, <span class="keyword">int</span>, <span class="keyword">uint32_t</span>)</span> </span>= &#123;</span><br><span class="line">    putreg(PBA),	putreg(EERD),	putreg(SWSM),	putreg(WUFC),</span><br><span class="line">    putreg(TDBAL),	putreg(TDBAH),	putreg(TXDCTL),	putreg(RDBAH),</span><br><span class="line">    putreg(RDBAL),	putreg(LEDCTL), putreg(VET),</span><br><span class="line">    [TDLEN] = set_dlen,	[RDLEN] = set_dlen,	[TCTL] = set_tctl,</span><br><span class="line">    [TDT] = set_tctl,	[MDIC] = set_mdic,	[ICS] = set_ics,</span><br><span class="line">    [TDH] = set_16bit,	[RDH] = set_16bit,	[RDT] = set_rdt,</span><br><span class="line">    [IMC] = set_imc,	[IMS] = set_ims,	[ICR] = set_icr,</span><br><span class="line">    [EECD] = set_eecd,	[RCTL] = set_rx_control, [CTRL] = set_ctrl,</span><br><span class="line">    [RA ... RA+<span class="number">31</span>] = &amp;mac_writereg,</span><br><span class="line">    [MTA ... MTA+<span class="number">127</span>] = &amp;mac_writereg,</span><br><span class="line">    [VFTA ... VFTA+<span class="number">127</span>] = &amp;mac_writereg,</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
 <p>我们这里举个例子就拿[TCTL] = set_tctl发送控制寄存器说事：</p>
@@ -324,7 +324,7 @@
 
 </div>
 
-    <a data-url="http://royhunter.github.io/2014/07/26/netdev-virtual-3/" data-id="ck2okz6kc002loukv978nr6fc" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+    <a data-url="http://royhunter.github.io/2014/07/26/netdev-virtual-3/" data-id="ck2pi7jqh0029dlkvrvqwbj91" class="article-share-link"><i class="fas fa-share"></i>Share</a>
 <script>
     (function ($) {
         // Prevent duplicate binding

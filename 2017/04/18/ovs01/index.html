@@ -13,12 +13,12 @@
 <meta property="og:site_name" content="RoyLuo&#39;s Notes">
 <meta property="og:description" content="OpenVSwitch基础-安装、配置、Simple Topology Test Case.">
 <meta property="og:locale" content="en">
-<meta property="og:image" content="http://7xoxkz.com1.z0.glb.clouddn.com/ns_3.PNG">
-<meta property="og:updated_time" content="2018-07-18T02:15:12.950Z">
+<meta property="og:image" content="http://royhunter.github.io/images/docker/ns_3.PNG">
+<meta property="og:updated_time" content="2019-11-08T02:41:38.007Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="OVS01-OVS基础-安装、配置、Simple Case">
 <meta name="twitter:description" content="OpenVSwitch基础-安装、配置、Simple Topology Test Case.">
-<meta name="twitter:image" content="http://7xoxkz.com1.z0.glb.clouddn.com/ns_3.PNG">
+<meta name="twitter:image" content="http://royhunter.github.io/images/docker/ns_3.PNG">
     
 
     
@@ -288,7 +288,7 @@
 <p>Bridge commands:<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">add-br BRIDGE               //create a new bridge named BRIDGE</span><br><span class="line">del-br BRIDGE               //delete BRIDGE and all of its ports</span><br><span class="line">list-br                     //print the names of all the bridges</span><br></pre></td></tr></table></figure></p>
 <p>Port commands:<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">list-ports BRIDGE           //print the names of all the ports on BRIDGE</span><br><span class="line">add-port BRIDGE PORT        //add network device PORT to BRIDGE</span><br><span class="line">del-port [BRIDGE] PORT      //delete PORT (which may be bonded) from BRIDGE</span><br></pre></td></tr></table></figure></p>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ovsdb-tool show-log</span><br></pre></td></tr></table></figure>
-<h2 id="Simple-Topology"><a href="#Simple-Topology" class="headerlink" title="Simple Topology"></a>Simple Topology</h2><p><img src="http://7xoxkz.com1.z0.glb.clouddn.com/ns_3.PNG" alt=""></p>
+<h2 id="Simple-Topology"><a href="#Simple-Topology" class="headerlink" title="Simple Topology"></a>Simple Topology</h2><p><img src="/images/docker/ns_3.PNG" alt=""></p>
 <h2 id="Configure-for-using-OVS"><a href="#Configure-for-using-OVS" class="headerlink" title="Configure for using OVS"></a>Configure for using OVS</h2><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">ovs-vsctl add-br br0</span><br><span class="line">ovs-vsctl show</span><br><span class="line">ip link add eth0-b <span class="built_in">type</span> veth peer name veth-b</span><br><span class="line">ip link add eth0<span class="_">-s</span> <span class="built_in">type</span> veth peer name veth<span class="_">-s</span></span><br><span class="line">ovs-vsctl add-port br0 veth-b</span><br><span class="line">ovs-vsctl add-port br0 veth<span class="_">-s</span></span><br><span class="line">ovs-vsctl show</span><br></pre></td></tr></table></figure>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">ip netns add beijing</span><br><span class="line">ip netns add shanghai</span><br><span class="line">ip netns</span><br><span class="line">ls /var/run/netns</span><br></pre></td></tr></table></figure>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">ip link <span class="built_in">set</span> veth-b up</span><br><span class="line">ip link <span class="built_in">set</span> veth<span class="_">-s</span> up</span><br><span class="line">ip link <span class="built_in">set</span> br0 up</span><br></pre></td></tr></table></figure>
@@ -306,7 +306,7 @@
 
 </div>
 
-    <a data-url="http://royhunter.github.io/2017/04/18/ovs01/" data-id="ck2okz6k70025oukvv1b5uf3v" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+    <a data-url="http://royhunter.github.io/2017/04/18/ovs01/" data-id="ck2pi7jqj002hdlkvibbwb4cm" class="article-share-link"><i class="fas fa-share"></i>Share</a>
 <script>
     (function ($) {
         // Prevent duplicate binding

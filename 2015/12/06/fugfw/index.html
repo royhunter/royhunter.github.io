@@ -13,12 +13,12 @@
 <meta property="og:site_name" content="RoyLuo&#39;s Notes">
 <meta property="og:description" content="周末在家研究了下“科学上网”，网上攻略众多，找了个同事强推的工具Shadowsocks试了下，果然很简单，很快，很稳定。这里简单记录了下搭建的整个过程。主要核心工具就是Digital Ocean的VPS + Shadowsocks工具。">
 <meta property="og:locale" content="en">
-<meta property="og:image" content="http://7xoy8o.com1.z0.glb.clouddn.com/8_1.png">
-<meta property="og:updated_time" content="2015-12-06T12:02:32.000Z">
+<meta property="og:image" content="http://royhunter.github.io/images/fcgfw/8_1.png">
+<meta property="og:updated_time" content="2019-11-08T02:22:30.450Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="科学上网：Digital Ocean + Shadowsocks">
 <meta name="twitter:description" content="周末在家研究了下“科学上网”，网上攻略众多，找了个同事强推的工具Shadowsocks试了下，果然很简单，很快，很稳定。这里简单记录了下搭建的整个过程。主要核心工具就是Digital Ocean的VPS + Shadowsocks工具。">
-<meta name="twitter:image" content="http://7xoy8o.com1.z0.glb.clouddn.com/8_1.png">
+<meta name="twitter:image" content="http://royhunter.github.io/images/fcgfw/8_1.png">
     
 
     
@@ -228,7 +228,7 @@
         
             
 	
-		<img src="http://7xoy8o.com1.z0.glb.clouddn.com/8_1.png" class="article-banner" />
+		<img src="/images/fcgfw/8_1.png" class="article-banner" />
 	
 
 
@@ -275,17 +275,17 @@
         
             
             <p>周末在家研究了下“科学上网”，网上攻略众多，找了个同事强推的工具Shadowsocks试了下，果然很简单，很快，很稳定。这里简单记录了下搭建的整个过程。<br>主要核心工具就是Digital Ocean的VPS + Shadowsocks工具。<br><a id="more"></a> </p>
-<h2 id="Digital-Ocean的VPS"><a href="#Digital-Ocean的VPS" class="headerlink" title="Digital Ocean的VPS"></a>Digital Ocean的VPS</h2><p>部署服务端首先需要一台VPS服务器（”Virtual Private Server”，或简称 “VPS”），这里主要使用的是Digital Ocean,该公司提供VPS比较稳定，而且提供SSD。最重要的是时常提供优惠，打折。可以降低使用的成本。优惠码和折扣信息可以自行在网上搜索，很多。<br>点击<a href="https://www.digitalocean.com/" target="_blank" rel="noopener">https://www.digitalocean.com/</a> 进入Digital进入Digital Ocean后注册一个用户后，需要绑定信用卡或Paypal支付验证，我使用了Paypal的支付，充值了5美金。<br>然后选择Droplet（就是VPS），选择了最便宜的配置：512M内存，20GB的硬盘。Image选择了14.04的ubuntu，SF的机房。5美金一个月，当订单完成后，1分钟内会部署好你的VPS，同时有一封邮件发送到你的注册邮箱，其中提供了登陆的方法和账号密码等信息。<br><img src="http://7xoy8o.com1.z0.glb.clouddn.com/1.PNG" alt=""></p>
+<h2 id="Digital-Ocean的VPS"><a href="#Digital-Ocean的VPS" class="headerlink" title="Digital Ocean的VPS"></a>Digital Ocean的VPS</h2><p>部署服务端首先需要一台VPS服务器（”Virtual Private Server”，或简称 “VPS”），这里主要使用的是Digital Ocean,该公司提供VPS比较稳定，而且提供SSD。最重要的是时常提供优惠，打折。可以降低使用的成本。优惠码和折扣信息可以自行在网上搜索，很多。<br>点击<a href="https://www.digitalocean.com/" target="_blank" rel="noopener">https://www.digitalocean.com/</a> 进入Digital进入Digital Ocean后注册一个用户后，需要绑定信用卡或Paypal支付验证，我使用了Paypal的支付，充值了5美金。<br>然后选择Droplet（就是VPS），选择了最便宜的配置：512M内存，20GB的硬盘。Image选择了14.04的ubuntu，SF的机房。5美金一个月，当订单完成后，1分钟内会部署好你的VPS，同时有一封邮件发送到你的注册邮箱，其中提供了登陆的方法和账号密码等信息。<br><img src="/images/fcgfw/1.PNG" alt=""></p>
 <p>这样我们就有一台VPS了，可以登上去测试下。</p>
 <h2 id="Shadowsocks"><a href="#Shadowsocks" class="headerlink" title="Shadowsocks"></a>Shadowsocks</h2><p>shadowsocks是一款私有协议（GFW就无法分析了）的代理软件，，目前还可以稳定提供上网代理。<br>shadowsocks客户端会在本地开启一个socks5代理，通过此代理的网络访问请求由客户端发送至服务端，服务端发出请求，收到响应数据后再发回客户端。<br>所以要选择一台台墙外的服务器来部署 shadowsocks 服务端。</p>
 <h3 id="安装"><a href="#安装" class="headerlink" title="安装"></a>安装</h3><p>在Ubuntu下安装shadowsocks：<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">apt-get install python-pip</span><br><span class="line">pip install shadowsocks</span><br></pre></td></tr></table></figure></p>
 <h3 id="配置"><a href="#配置" class="headerlink" title="配置"></a>配置</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">root@royluo:<span class="comment">#vim /etc/shadowsocks.json</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="string">"server"</span>:<span class="string">"0.0.0.0"</span>, </span><br><span class="line">	<span class="string">"server_port"</span>:8388, </span><br><span class="line">	<span class="string">"local_port"</span>:1080, </span><br><span class="line">	<span class="string">"password"</span>:<span class="string">"password"</span>, //&lt;======config your own passwd</span><br><span class="line">	<span class="string">"timeout"</span>:600, </span><br><span class="line">	<span class="string">"method"</span>:<span class="string">"aes-256-cfb"</span>, </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <h3 id="启动和关闭"><a href="#启动和关闭" class="headerlink" title="启动和关闭"></a>启动和关闭</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">ssserver -c /etc/shadowsocks.json -d start</span><br><span class="line">ssserver -c /etc/shadowsocks.json -d stop</span><br></pre></td></tr></table></figure>
 <p>Server端就是这么多配置。</p>
-<h2 id="客户端配置"><a href="#客户端配置" class="headerlink" title="客户端配置"></a>客户端配置</h2><h3 id="Win10"><a href="#Win10" class="headerlink" title="Win10"></a>Win10</h3><h4 id="代理服务器设置"><a href="#代理服务器设置" class="headerlink" title="代理服务器设置"></a>代理服务器设置</h4><p><a href="http://sourceforge.net/projects/shadowsocksgui/files/dist/" target="_blank" rel="noopener">http://sourceforge.net/projects/shadowsocksgui/files/dist/</a>点击下载dotnet4.0的那个。<br>下载后解压运行，在界面中选择编辑服务器，配置如下,完成后启动代理。<br><img src="http://7xoy8o.com1.z0.glb.clouddn.com/2.PNG" alt=""></p>
-<h4 id="Chrome设置"><a href="#Chrome设置" class="headerlink" title="Chrome设置"></a>Chrome设置</h4><p>下载Proxy SwitchySharp 插件:<br><a href="https://chrome.google.com/webstore/detail/proxy-switchysharp/dpplabbmogkhghncfbfdeeokoefdjegm?hl=zh-CN" target="_blank" rel="noopener">https://chrome.google.com/webstore/detail/proxy-switchysharp/dpplabbmogkhghncfbfdeeokoefdjegm?hl=zh-CN</a><br>配置如下：<br><img src="http://7xoy8o.com1.z0.glb.clouddn.com/3.PNG" alt=""><br><img src="http://7xoy8o.com1.z0.glb.clouddn.com/4.PNG" alt=""><br>最后在chrome的右上角会出现一个地球的button，可以切换代理的开关。<br><img src="http://7xoy8o.com1.z0.glb.clouddn.com/5.PNG" alt=""><br>试试google吧，是不是感觉呼吸到自由的空气了。<br><img src="http://7xoy8o.com1.z0.glb.clouddn.com/6.PNG" alt=""></p>
+<h2 id="客户端配置"><a href="#客户端配置" class="headerlink" title="客户端配置"></a>客户端配置</h2><h3 id="Win10"><a href="#Win10" class="headerlink" title="Win10"></a>Win10</h3><h4 id="代理服务器设置"><a href="#代理服务器设置" class="headerlink" title="代理服务器设置"></a>代理服务器设置</h4><p><a href="http://sourceforge.net/projects/shadowsocksgui/files/dist/" target="_blank" rel="noopener">http://sourceforge.net/projects/shadowsocksgui/files/dist/</a>点击下载dotnet4.0的那个。<br>下载后解压运行，在界面中选择编辑服务器，配置如下,完成后启动代理。<br><img src="/images/fcgfw/2.PNG" alt=""></p>
+<h4 id="Chrome设置"><a href="#Chrome设置" class="headerlink" title="Chrome设置"></a>Chrome设置</h4><p>下载Proxy SwitchySharp 插件:<br><a href="https://chrome.google.com/webstore/detail/proxy-switchysharp/dpplabbmogkhghncfbfdeeokoefdjegm?hl=zh-CN" target="_blank" rel="noopener">https://chrome.google.com/webstore/detail/proxy-switchysharp/dpplabbmogkhghncfbfdeeokoefdjegm?hl=zh-CN</a><br>配置如下：<br><img src="/images/fcgfw/3.PNG" alt=""><br><img src="/images/fcgfw/4.PNG" alt=""><br>最后在chrome的右上角会出现一个地球的button，可以切换代理的开关。<br><img src="/images/fcgfw/5.PNG" alt=""><br>试试google吧，是不是感觉呼吸到自由的空气了。<br><img src="/images/fcgfw/6.PNG" alt=""></p>
 <p>本人不才，Firefox的设置一直没成功，望高手指点。。。。。</p>
-<h3 id="MAC"><a href="#MAC" class="headerlink" title="MAC"></a>MAC</h3><p>MAC的配置就更简单了，下载<br><a href="http://pan.baidu.com/s/1dDLXimt" target="_blank" rel="noopener">http://pan.baidu.com/s/1dDLXimt</a>，安装。<br>如下配置：<br><img src="http://7xoy8o.com1.z0.glb.clouddn.com/7.png" alt=""><br>一步到位。</p>
+<h3 id="MAC"><a href="#MAC" class="headerlink" title="MAC"></a>MAC</h3><p>MAC的配置就更简单了，下载<br><a href="http://pan.baidu.com/s/1dDLXimt" target="_blank" rel="noopener">http://pan.baidu.com/s/1dDLXimt</a>，安装。<br>如下配置：<br><img src="/images/fcgfw/7.png" alt=""><br>一步到位。</p>
 
         
         </div>
@@ -296,7 +296,7 @@
 
 </div>
 
-    <a data-url="http://royhunter.github.io/2015/12/06/fugfw/" data-id="ck2okz6jj000koukvjonx6yyq" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+    <a data-url="http://royhunter.github.io/2015/12/06/fugfw/" data-id="ck2pi7jpx000mdlkvp8jkdx93" class="article-share-link"><i class="fas fa-share"></i>Share</a>
 <script>
     (function ($) {
         // Prevent duplicate binding

@@ -14,7 +14,7 @@
 <meta property="og:description" content="What’s distributed concensus基于消息传递通信模型的分布式系统，不可避免地会发生以下错误：进程可能会慢、垮、重启，消息可能会延迟、丢失、重复；在分布式领域中，数据的存储的一致性一直是一个比较核心的问题。">
 <meta property="og:locale" content="en">
 <meta property="og:image" content="http://7xoxkz.com1.z0.glb.clouddn.com/raft-0.PNG">
-<meta property="og:updated_time" content="2016-03-16T15:32:54.000Z">
+<meta property="og:updated_time" content="2019-11-08T02:45:31.688Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Distributed Concensus:Raft">
 <meta name="twitter:description" content="What’s distributed concensus基于消息传递通信模型的分布式系统，不可避免地会发生以下错误：进程可能会慢、垮、重启，消息可能会延迟、丢失、重复；在分布式领域中，数据的存储的一致性一直是一个比较核心的问题。">
@@ -277,7 +277,7 @@
             <h2 id="What’s-distributed-concensus"><a href="#What’s-distributed-concensus" class="headerlink" title="What’s distributed concensus"></a>What’s distributed concensus</h2><p>基于消息传递通信模型的分布式系统，不可避免地会发生以下错误：进程可能会慢、垮、重启，消息可能会延迟、丢失、重复；在分布式领域中，数据的存储的一致性一直是一个比较核心的问题。</p>
 <a id="more"></a> 
 <h2 id="What’s-Raft"><a href="#What’s-Raft" class="headerlink" title="What’s Raft"></a>What’s Raft</h2><p>1990年莱斯利·兰伯特就提出了Paxos算法，奠定了其在分布式一致性方面的地位，但其由于算法自身的复杂性令人望而却步（本人也尝试学习了，…)，也很难从系统实现角度发挥作用，目前Zookeeper中采用了Paxos算法。<br>Raft生来目标就是可理解的一致性算法，在论文<a href="http://ramcloud.stanford.edu/raft.pdf" target="_blank" rel="noopener">In Search of an Understandable Consensus Algorithm (Extended Version)</a> by Diego Ongaro and John Ousterhout 中，其将算法的可理解性摆在了首要的位置。<br><a href="raft.github.io">raft.github.io</a>中有大量学习的资料可供参考。</p>
-<h2 id="Raft"><a href="#Raft" class="headerlink" title="Raft"></a>Raft</h2><h2 id="Architecture"><a href="#Architecture" class="headerlink" title="Architecture"></a>Architecture</h2><p>Replicated state machine architecture. The consensus algorithm manages a replicated log containing state machine commands from clients. The state machines process identical sequences of commands from the logs, so they produce the same outputs.<br><img src="http://7xoxkz.com1.z0.glb.clouddn.com/raft-4.PNG" alt=""></p>
+<h2 id="Raft"><a href="#Raft" class="headerlink" title="Raft"></a>Raft</h2><h2 id="Architecture"><a href="#Architecture" class="headerlink" title="Architecture"></a>Architecture</h2><p>Replicated state machine architecture. The consensus algorithm manages a replicated log containing state machine commands from clients. The state machines process identical sequences of commands from the logs, so they produce the same outputs.<br><img src="/images/docker/raft-4.PNG" alt=""></p>
 <h2 id="Decompose"><a href="#Decompose" class="headerlink" title="Decompose"></a>Decompose</h2><p>为使算法达到可理解性，Raft内部将一致性问题拆解成三个相对独立的子问题</p>
 <ol>
 <li>Leader election</li>
@@ -291,7 +291,7 @@
 <li>Follower</li>
 </ol>
 <p>每个cluster最多且仅有一个leader来进行管理；</p>
-<p>时间被分成很多连续的随机长度的term，可以理解为选举的任期。一个term由一个唯一的id来表示，如下图：<br><img src="http://7xoxkz.com1.z0.glb.clouddn.com/raft-1.PNG" alt=""></p>
+<p>时间被分成很多连续的随机长度的term，可以理解为选举的任期。一个term由一个唯一的id来表示，如下图：<br><img src="/images/docker/raft-1.PNG" alt=""></p>
 <p>一种term的组成先是成功的选举，接着是由leader管理的时间区间直到该term结束(leader node可能crash，需要重新选举)；另一种term的组成是独立的term区间无成功的选举，则需要进行下一个term的操作。</p>
 <h4 id="选举流程与细则"><a href="#选举流程与细则" class="headerlink" title="选举流程与细则"></a>选举流程与细则</h4><ol>
 <li>默认各结点启动后进入follower角色并启动定时器，在timeout时间内没有收到任何通信则进入candidate角色；</li>
@@ -300,7 +300,7 @@
 <li>若某结点在candidate阶段收到leader的通告，则进入follower角色，返回step1；</li>
 <li>若结点在leader阶段时收到更新的term计数是，则进入follower角色，返回step1；</li>
 </ol>
-<p><img src="http://7xoxkz.com1.z0.glb.clouddn.com/raft-2.PNG" alt=""></p>
+<p><img src="/images/docker/raft-2.PNG" alt=""></p>
 <h4 id="Split-Vote处理"><a href="#Split-Vote处理" class="headerlink" title="Split Vote处理"></a>Split Vote处理</h4><p>若两个结点同时进入candidate角色，同时发起RequestVote RPC，所获得的选票数量都达不到大多数（选票分散），则双方都退回follower，采用随机timeout时间后再进行选举动作，有效退避，提高选举效率；</p>
 <p>当选举结束后，机器内部就有leader进行持续管理，使用heartbeat监控各结点状态。</p>
 <h2 id="Log-replication"><a href="#Log-replication" class="headerlink" title="Log replication"></a>Log replication</h2><h3 id="流程"><a href="#流程" class="headerlink" title="流程"></a>流程</h3><ol>
@@ -311,7 +311,7 @@
 <li>Leader通过后续AppendEntriesRPC通知Follower已commit；</li>
 <li>Follower收到commit的log后，将对于的log也commit进StateMachine；</li>
 </ol>
-<p><img src="http://7xoxkz.com1.z0.glb.clouddn.com/raft-3.PNG" alt=""></p>
+<p><img src="/images/docker/raft-3.PNG" alt=""></p>
 <p>log组成由log index，term，及command组成；<br>可视化过程： <a href="http://thesecretlivesofdata.com/raft/" target="_blank" rel="noopener">http://thesecretlivesofdata.com/raft/</a> </p>
 <h2 id="Safety"><a href="#Safety" class="headerlink" title="Safety"></a>Safety</h2><h3 id="Election-restriction"><a href="#Election-restriction" class="headerlink" title="Election restriction"></a>Election restriction</h3><ol>
 <li>log entries只存在一个方向的流动，即leader to followers；</li>
@@ -335,7 +335,7 @@
 
 </div>
 
-    <a data-url="http://royhunter.github.io/2016/03/16/raft/" data-id="ck2okz6kk0038oukvykzk1ahy" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+    <a data-url="http://royhunter.github.io/2016/03/16/raft/" data-id="ck2pi7jqp002zdlkvr0rao8tq" class="article-share-link"><i class="fas fa-share"></i>Share</a>
 <script>
     (function ($) {
         // Prevent duplicate binding

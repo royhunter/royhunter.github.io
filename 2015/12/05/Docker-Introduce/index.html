@@ -13,12 +13,12 @@
 <meta property="og:site_name" content="RoyLuo&#39;s Notes">
 <meta property="og:description" content="Docker最近这几年成为了虚拟化领域炙手可热的话题，发展也极为迅速，不同于KVM的OS级虚拟化解决方案，Docker从容器级虚拟化技术角度提供了一个开放的，及其轻量级的虚拟化平台。  Docker helps you ship code faster, test faster, deploy faster, and shorten the cycle between writing code a">
 <meta property="og:locale" content="en">
-<meta property="og:image" content="http://7xoxkz.com1.z0.glb.clouddn.com/1.PNG">
-<meta property="og:updated_time" content="2015-12-05T13:25:48.000Z">
+<meta property="og:image" content="http://royhunter.github.io/images/docker/1.PNG">
+<meta property="og:updated_time" content="2019-11-08T02:19:59.491Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Docker Introduce">
 <meta name="twitter:description" content="Docker最近这几年成为了虚拟化领域炙手可热的话题，发展也极为迅速，不同于KVM的OS级虚拟化解决方案，Docker从容器级虚拟化技术角度提供了一个开放的，及其轻量级的虚拟化平台。  Docker helps you ship code faster, test faster, deploy faster, and shorten the cycle between writing code a">
-<meta name="twitter:image" content="http://7xoxkz.com1.z0.glb.clouddn.com/1.PNG">
+<meta name="twitter:image" content="http://royhunter.github.io/images/docker/1.PNG">
     
 
     
@@ -228,7 +228,7 @@
         
             
 	
-		<img src="http://7xoxkz.com1.z0.glb.clouddn.com/1.PNG" class="article-banner" />
+		<img src="/images/docker/1.PNG" class="article-banner" />
 	
 
 
@@ -280,7 +280,7 @@
 </blockquote>
 <a id="more"></a> 
 <h2 id="What-is-Docker"><a href="#What-is-Docker" class="headerlink" title="What is Docker?"></a>What is Docker?</h2><p>在前面KVM的一系列的文章中，我们可以看到，KVM基于Linux内核资源，借助于硬件辅助虚拟化技术从OS级上提供了完整的虚拟化平台解决方案。而Docker从应用级别角度使用容器技术，隔离了容器的各自运行环境，成为了一个轻量级的虚拟化平台。<br>Docker提供了一种能力，使任何应用程序能够安全地隔离于其他应用在一个独立的容器中运行。 隔离与安全性可以使多个容器可以共同运行于Host。其轻量级的特性规避了hypervisor的运行消耗，从而可以充分利用硬件资源。</p>
-<p><img src="http://7xoxkz.com1.z0.glb.clouddn.com/2.PNG" alt=""></p>
+<p><img src="/images/docker/2.PNG" alt=""></p>
 <p>在上图Virtual Machine与container平台对比中可以看到，Virtual Machine平台主要是通过Host上的hypervisor运行的多个Guest OS来达到运行环境的隔离性，而Container技术主要通过Container引擎来驱动隔离性，没有引入新的OS，减轻了系统的运行负担，使得上层应用程序可以直接复用Host OS的资源和功能，达到轻量级的运行特性。</p>
 <h2 id="Docker的优势"><a href="#Docker的优势" class="headerlink" title="Docker的优势"></a>Docker的优势</h2><ol>
 <li><p>更快的交付你的应用<br>Docker可以让一个团队工作成员各自工作在本地的容器中，并通过持续的集成和迭代加快开发速度，提高开发效率。这一特性很像代码版本的分布式控制系统，用过GIT进行代码管理的开发者应该对此更理解一些。</p>
@@ -294,7 +294,7 @@
 <p>在我本机上运行的是Ubuntu14.04，集成了Docker的安装包，所以可以直接安装：<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">root@royluo:~<span class="comment"># apt-get install -y docker.io</span></span><br></pre></td></tr></table></figure></p>
 <p>安装完启动后，可以看到系统中运行了docker daemon：<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">root@royluo:~<span class="comment"># ps aux|grep docker</span></span><br><span class="line">root     13971  1.5  1.8 235384  9156 ?        Ssl  07:53   0:00 /usr/bin/docker -d</span><br></pre></td></tr></table></figure></p>
 <p>由于Docker Client与Daemon共用的是同一个可执行文件，所以Daemon启动时加上-d选项。而Client直接使用docker命令。<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">root@royluo:~<span class="comment"># docker --help</span></span><br><span class="line">Usage: docker [OPTIONS] COMMAND [arg...]</span><br><span class="line"></span><br><span class="line">A self-sufficient runtime <span class="keyword">for</span> linux containers.</span><br><span class="line">......</span><br></pre></td></tr></table></figure></p>
-<p>摘自官网的一幅图：可以看到Client和Daemon的交互关系.<br><img src="http://7xoxkz.com1.z0.glb.clouddn.com/3.PNG" alt=""></p>
+<p>摘自官网的一幅图：可以看到Client和Daemon的交互关系.<br><img src="/images/docker/3.PNG" alt=""></p>
 <p>其中也说明了Docker的内部组成：</p>
 <h3 id="Docker-images"><a href="#Docker-images" class="headerlink" title="Docker images."></a>Docker images.</h3><p>一个Docker image是一个只读的模板，其包含了需要运行的应用所需的组件，例如库，可执行程序等，是一个静态的概念。</p>
 <h3 id="Docker-registries"><a href="#Docker-registries" class="headerlink" title="Docker registries."></a>Docker registries.</h3><p>我的理解是image的仓库，提供类似于Github的服务，其提供image的管理操作。</p>
@@ -315,7 +315,7 @@
 
 </div>
 
-    <a data-url="http://royhunter.github.io/2015/12/05/Docker-Introduce/" data-id="ck2okz6it0000oukvquof6lek" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+    <a data-url="http://royhunter.github.io/2015/12/05/Docker-Introduce/" data-id="ck2pi7jpe0000dlkvx94krhzk" class="article-share-link"><i class="fas fa-share"></i>Share</a>
 <script>
     (function ($) {
         // Prevent duplicate binding

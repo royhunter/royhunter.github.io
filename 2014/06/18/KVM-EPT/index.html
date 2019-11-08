@@ -13,19 +13,19 @@
 <meta property="og:site_name" content="RoyLuo&#39;s Notes">
 <meta property="og:description" content="传统OS环境中，CPU对内存的访问都必须通过MMU将虚拟地址VA转换为物理地址PA从而得到真正的Physical Memory Access,即：VA-&amp;gt;MMU-&amp;gt;PA，见下图。 虚拟运行环境中由于Guest OS所使用的物理地址空间并不是真正的物理内存，而是由VMM供其所使用一层虚拟的物理地址空间，为使MMU能够正确的转换虚实地址，Guest中的地址空间的转换和访问都必须借助VMM来">
 <meta property="og:locale" content="en">
-<meta property="og:image" content="http://7jpnjo.com1.z0.glb.clouddn.com/11.PNG">
-<meta property="og:image" content="http://7jpnjo.com1.z0.glb.clouddn.com/EPT9.png">
-<meta property="og:image" content="http://7jpnjo.com1.z0.glb.clouddn.com/EPT1.png">
-<meta property="og:image" content="http://7jpnjo.com1.z0.glb.clouddn.com/EPT2.PNG">
-<meta property="og:image" content="http://7jpnjo.com1.z0.glb.clouddn.com/EPT3.png">
-<meta property="og:image" content="http://7jpnjo.com1.z0.glb.clouddn.com/EPT5.png">
-<meta property="og:image" content="http://7jpnjo.com1.z0.glb.clouddn.com/EPT6.png">
-<meta property="og:image" content="http://7jpnjo.com1.z0.glb.clouddn.com/EPT8.png">
-<meta property="og:updated_time" content="2015-08-04T14:02:42.000Z">
+<meta property="og:image" content="http://royhunter.github.io/images/kvm-ept/11.PNG">
+<meta property="og:image" content="http://royhunter.github.io/images/kvm-ept/EPT9.png">
+<meta property="og:image" content="http://royhunter.github.io/images/kvm-ept/EPT1.png">
+<meta property="og:image" content="http://royhunter.github.io/images/kvm-ept/EPT2.PNG">
+<meta property="og:image" content="http://royhunter.github.io/images/kvm-ept/EPT3.png">
+<meta property="og:image" content="http://royhunter.github.io/images/kvm-ept/EPT5.png">
+<meta property="og:image" content="http://royhunter.github.io/images/kvm-ept/EPT6.png">
+<meta property="og:image" content="http://royhunter.github.io/images/kvm-ept/EPT8.png">
+<meta property="og:updated_time" content="2019-11-08T02:29:37.782Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="KVM硬件辅助虚拟化之 EPT(Extended Page Table)">
 <meta name="twitter:description" content="传统OS环境中，CPU对内存的访问都必须通过MMU将虚拟地址VA转换为物理地址PA从而得到真正的Physical Memory Access,即：VA-&amp;gt;MMU-&amp;gt;PA，见下图。 虚拟运行环境中由于Guest OS所使用的物理地址空间并不是真正的物理内存，而是由VMM供其所使用一层虚拟的物理地址空间，为使MMU能够正确的转换虚实地址，Guest中的地址空间的转换和访问都必须借助VMM来">
-<meta name="twitter:image" content="http://7jpnjo.com1.z0.glb.clouddn.com/11.PNG">
+<meta name="twitter:image" content="http://royhunter.github.io/images/kvm-ept/11.PNG">
     
 
     
@@ -276,7 +276,7 @@
             <p>传统OS环境中，CPU对内存的访问都必须通过MMU将虚拟地址VA转换为物理地址PA从而得到真正的Physical Memory Access,即：<strong>VA-&gt;MMU-&gt;PA</strong>，见下图。</p>
 <p>虚拟运行环境中由于Guest OS所使用的物理地址空间并不是真正的物理内存，而是由VMM供其所使用一层虚拟的物理地址空间，为使MMU能够正确的转换虚实地址，Guest中的地址空间的转换和访问都必须借助VMM来实现，这就是内存虚拟化的主要任务，即：<strong>GVA-&gt;MMU Virtualation-&gt;HPA</strong>，见下图。</p>
 <a id="more"></a>
-<p><img src="http://7jpnjo.com1.z0.glb.clouddn.com/11.PNG" alt=""></p>
+<p><img src="/images/kvm-ept/11.PNG" alt=""></p>
 <h2 id="MMU虚拟化方案"><a href="#MMU虚拟化方案" class="headerlink" title="MMU虚拟化方案"></a>MMU虚拟化方案</h2><p>内存虚拟化，也可以称为MMU的虚拟化，目前有两种方案：</p>
 <ul>
 <li>影子页表(Shadow Page Table)</li>
@@ -286,7 +286,7 @@
 <li>EPT(Extended Page Table)</li>
 </ul>
 <p>为了解决影子页表的低效，VT-x(Intel虚拟化技术方案)提供了Extended Page Table(EPT)技术,直接在硬件上支持了GVA-&gt;GPA-&gt;HPA的两次地址转换，大大降低了内存虚拟化的难度，也大大提高了性能。<strong>本文主要讲述EPT支持下的内存虚拟化方案</strong>。  </p>
-<p><img src="http://7jpnjo.com1.z0.glb.clouddn.com/EPT9.png" alt=""></p>
+<p><img src="/images/kvm-ept/EPT9.png" alt=""></p>
 <h2 id="EPT原理"><a href="#EPT原理" class="headerlink" title="EPT原理"></a>EPT原理</h2><h3 id="地址空间说明"><a href="#地址空间说明" class="headerlink" title="地址空间说明"></a>地址空间说明</h3><ul>
 <li>GVA: Guest Virtual Address</li>
 <li>GPA: Guest Physical Address</li>
@@ -294,7 +294,7 @@
 <li>HPA: Host Physical Address</li>
 </ul>
 <h3 id="原理描述"><a href="#原理描述" class="headerlink" title="原理描述"></a>原理描述</h3><p>这里假设Guest OS页表和EPT页表都是4级页表，CPU完成一次地址转换的基本过程如下：</p>
-<p><img src="http://7jpnjo.com1.z0.glb.clouddn.com/EPT1.png" alt=""></p>
+<p><img src="/images/kvm-ept/EPT1.png" alt=""></p>
 <p>如上图所示：</p>
 <ol>
 <li>CPU首先查找Guest CR3指向的L4页表；</li>
@@ -306,7 +306,7 @@
 <li>L2，L1页表的访问也是如此，直至找到最终于与GPA对应的HPA。</li>
 </ol>
 <h2 id="核心代码说明"><a href="#核心代码说明" class="headerlink" title="核心代码说明"></a>核心代码说明</h2><h3 id="初始化"><a href="#初始化" class="headerlink" title="初始化"></a>初始化</h3><p>在内核KVM模块提供的创建VCPU API函数中，进行了虚拟MMU的创建和初始化，调用流程如下所示：</p>
-<p><img src="http://7jpnjo.com1.z0.glb.clouddn.com/EPT2.PNG" alt=""></p>
+<p><img src="/images/kvm-ept/EPT2.PNG" alt=""></p>
 <p>由于EPT页表操作和影子页表的操作很多步骤上是一致的，所以EPT处理过程中复用了大量的影子页表操作的函数。<br>其中比较重要的初始化函数为</p>
 <pre><code>static void init_kvm_mmu(struct kvm_vcpu *vcpu)
 </code></pre><p>当全局变量tdp_enabled为1时，就会使能EPT功能。</p>
@@ -328,7 +328,7 @@
     context-&gt;inject_page_fault = kvm_inject_page_fault;
 }
 </code></pre><h3 id="MMU-Setup"><a href="#MMU-Setup" class="headerlink" title="MMU Setup"></a>MMU Setup</h3><p>在进入Guest之前，KVM会将EPTP与Guest CR3设置好，这样Guest OS才会顺利运行，函数调用关系如下：</p>
-<p><img src="http://7jpnjo.com1.z0.glb.clouddn.com/EPT3.png" alt=""></p>
+<p><img src="/images/kvm-ept/EPT3.png" alt=""></p>
 <p>关键函数：</p>
 <pre><code>static struct kvm_mmu_page *kvm_mmu_alloc_page(struct kvm_vcpu *vcpu, u64 *parent_pte, int direct)
 {
@@ -390,8 +390,8 @@ int kvm_mmu_page_fault(struct kvm_vcpu *vcpu, gva_t cr2, u32 error_code, void *i
     r = __direct_map(vcpu, gpa, write, map_writable, level, gfn, pfn, prefault);
     ......
 }
-</code></pre><p><img src="http://7jpnjo.com1.z0.glb.clouddn.com/EPT5.png" alt=""></p>
-<p><img src="http://7jpnjo.com1.z0.glb.clouddn.com/EPT6.png" alt=""></p>
+</code></pre><p><img src="/images/kvm-ept/EPT5.png" alt=""></p>
+<p><img src="/images/kvm-ept/EPT6.png" alt=""></p>
 <p>for_each_shadow_entry(){}不断的遍历页表的层级，如果下一级的页表项不存在，则分配一个EPT页表页，设置缺失的页表项，再进行下一级的页表项的查找，直至达到需要填充的页表级，一般为最后一级。<br>将在前面流程中获取的HPA通过mmu_set_spte()进行设置。如果原来存在，说明该页表项已经失效，需要更新、覆盖，最后刷新TLB。</p>
 <p>再介绍下for_each_shadow_entry(){}的流程：</p>
 <pre><code>struct kvm_shadow_walk_iterator {
@@ -407,7 +407,7 @@ for (shadow_walk_init(&amp;(_walker), _vcpu, _addr);    \
      shadow_walk_okay(&amp;(_walker));            \
      shadow_walk_next(&amp;(_walker)))
 </code></pre><p>shadow walk init/okay/next操作见下图：</p>
-<p><img src="http://7jpnjo.com1.z0.glb.clouddn.com/EPT8.png" alt=""></p>
+<p><img src="/images/kvm-ept/EPT8.png" alt=""></p>
 <h3 id="Conclusion"><a href="#Conclusion" class="headerlink" title="Conclusion"></a>Conclusion</h3><p>OK，一个完整的EPT初始化、设置、使用流程到此结束。总结一下几个地址空间的关系：</p>
 <ul>
 <li>GVA到GPA的映射关系由Guest OS的页表来维护;</li>
@@ -425,7 +425,7 @@ for (shadow_walk_init(&amp;(_walker), _vcpu, _addr);    \
 
 </div>
 
-    <a data-url="http://royhunter.github.io/2014/06/18/KVM-EPT/" data-id="ck2okz6j50006oukvwy1yk5j4" class="article-share-link"><i class="fas fa-share"></i>Share</a>
+    <a data-url="http://royhunter.github.io/2014/06/18/KVM-EPT/" data-id="ck2pi7jpm0006dlkv7wn13iya" class="article-share-link"><i class="fas fa-share"></i>Share</a>
 <script>
     (function ($) {
         // Prevent duplicate binding
